@@ -8,7 +8,6 @@ SEXP syms_vec_slice_fallback = NULL;
 SEXP fns_vec_slice_fallback = NULL;
 
 // Defined below
-static SEXP slice_names(SEXP names, SEXP index);
 static SEXP slice_rownames(SEXP names, SEXP index);
 
 /**
@@ -190,7 +189,8 @@ static SEXP raw_slice(SEXP x, SEXP index) {
     SLICE_BARRIER_INDEX(RTYPE, GET, SET, NA_VALUE);         \
   }
 
-static SEXP list_slice(SEXP x, SEXP index) {
+// [[ include("slice.h") ]]
+SEXP list_slice(SEXP x, SEXP index) {
   SLICE_BARRIER(VECSXP, VECTOR_ELT, SET_VECTOR_ELT, R_NilValue);
 }
 
@@ -293,7 +293,8 @@ static void repair_na_names(SEXP names, SEXP index) {
   }
 }
 
-static SEXP slice_names(SEXP names, SEXP index) {
+// [[ include("slice.h") ]]
+SEXP slice_names(SEXP names, SEXP index) {
   if (names == R_NilValue) {
     return names;
   }
@@ -660,6 +661,7 @@ static SEXP chr_as_index(SEXP i, SEXP names) {
   return matched;
 }
 
+// [[ include("slice.h") ]]
 SEXP vec_as_index(SEXP i, R_len_t n, SEXP names) {
   struct vec_as_index_options opts = { .convert_negative = true };
   return vec_as_index_opts(i, n, names, &opts);

@@ -89,3 +89,113 @@ test_that("vec_proxy_equal() is recursive over data frames (#641)", {
   overridden <- vec_proxy_equal(x)
   expect_identical(overridden$x, c(0, 0, 0))
 })
+
+test_that("vec_proxy_push_vcols() pushes virtual columns", {
+  proxy <- data_frame(x = 1:3)
+
+  out <- vec_proxy_push_vcols(proxy, `pkg::foo` = data_frame(bar = 11:13))
+  exp <- data_frame(
+    x = 1:3,
+    `vctrs::virtual_cols` = data_frame(
+      `pkg::foo` = data_frame(bar = 11:13)
+    )
+  )
+  expect_identical(out, exp)
+
+  out <- vec_proxy_push_vcols(out, `pkg::baz` = data_frame(bam = 21:23))
+  exp <- data_frame(
+    x = 1:3,
+    `vctrs::virtual_cols` = data_frame(
+      `pkg::foo` = data_frame(bar = 11:13),
+      `pkg::baz` = data_frame(bam = 21:23)
+    )
+  )
+  expect_identical(out, exp)
+})
+
+test_that("can push virtual columns on empty data frame", {
+  proxy <- data_frame(n = 3L)
+  out <- vec_proxy_push_vcols(proxy, `pkg::foo` = 1:3)
+  exp <- data_frame(`vctrs::virtual_cols` = data_frame(`pkg::foo` = 1:3))
+  expect_identical(out, exp)
+})
+
+test_that("vec_proxy_pop_vcols() pops virtual columns", {
+  vcols <- data_frame(
+    foo = 11:13,
+    bar = 21:23
+  )
+  proxy <- data_frame(
+    x = 1:3,
+    `vctrs::virtual_cols` = vcols
+  )
+
+  out <- vec_proxy_pop_vcols(proxy, "bar")
+  expect_identical(out$proxy$`vctrs::virtual_cols`, data_frame(foo = 11:13))
+  expect_identical(out$vcols, data_frame(bar = 21:23))
+
+  out <- vec_proxy_pop_vcols(out$proxy, "foo")
+  expect_identical(out$proxy, data_frame(x = 1:3))
+  expect_identical(out$vcols, data_frame(foo = 11:13))
+})
+
+test_that("vec_proxy_pop_vcols() pops multiple virtual columns", {
+  vcols <- data_frame(
+    foo = 11:13,
+    bar = 21:23,
+    foo = 31:33,
+    bar = 41:43
+  )
+  proxy <- data_frame(
+    x = 1:3,
+    `vctrs::virtual_cols` = vcols
+  )
+
+  out <- vec_proxy_pop_vcols(proxy, "foo")
+  expect_identical(out$proxy$`vctrs::virtual_cols`, data_frame(bar = 21:23, bar = 41:43))
+  expect_identical(out$vcols, data_frame(foo = 11:13, foo = 31:33))
+
+  out <- vec_proxy_pop_vcols(out$proxy, "bar")
+  expect_identical(out$proxy, data_frame(x = 1:3))
+  expect_identical(out$vcols, data_frame(bar = 21:23, bar = 41:43))
+})
+
+test_that("can proxy and restore virtual columns", {
+  local_vcols_methods()
+  x <- new_vcols(data_frame(x = 1:3), groups = c(1L, 1L, 2L))
+  expect_identical(vec_restore(vec_proxy(x), to = x), x)
+})
+
+test_that("can slice table with virtual columns", {
+  local_vcols_methods()
+  x <- new_vcols(data_frame(x = 1:3), groups = c(1L, 1L, 2L))
+  exp <- new_vcols(data_frame(x...1 = 1:3, x...2 = 1:3), groups = c(1L, 1L, 2L))
+  expect_identical(tbl_slice(x, c(1, 1)), exp)
+})
+
+test_that("can take the prototype with virtual columns", {
+  local_vcols_methods()
+  x <- new_vcols(data_frame(x = 1:3), groups = c(1L, 1L, 2L))
+  expect_identical(tbl_ptype(x), new_vcols(new_data_frame(n = 3L), groups = c(1L, 1L, 2L)))
+})
+
+test_that("can cbind with virtual columns", {
+  local_vcols_ptype2_methods()
+  local_vcols_cast_methods()
+  local_vcols_memory_methods()
+  x <- new_vcols(data_frame(x = 1:3), groups = c(1L, 1L, 2L))
+  expect_identical(
+    vec_cbind(x, x),
+    new_vcols(data.frame(x...1 = 1:3, x...2 = 1:3), groups = c(1L, 1L, 2L))
+  )
+})
+
+test_that("row names are propagated after pushing and popping vcols", {
+  proxy <- new_data_frame(list(x = 1:3), row_names = letters[1:3])
+  proxy <- vec_proxy_push_vcols(proxy, foo = 4:6)
+  expect_identical(row.names(proxy), letters[1:3])
+
+  data <- vec_proxy_pop_vcols(proxy, "foo")
+  expect_identical(row.names(data$proxy), letters[1:3])
+  expect_identical(row.names(data$vcols), letters[1:3])
+})

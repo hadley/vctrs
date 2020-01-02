@@ -77,3 +77,8 @@ test_that("unspecified() validates input", {
 test_that("tibble::type_sum() knows about unspecified", {
   expect_identical(tibble::type_sum(unspecified(3)), "???")
 })
+
+test_that("casting type to unspecified forwards to the logical method", {
+  expect_identical(vec_cast(1L, unspecified()), TRUE)
+  expect_error(vec_cast(data.frame(), unspecified()), class = "vctrs_error_incompatible_cast")
+})

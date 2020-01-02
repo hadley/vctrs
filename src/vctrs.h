@@ -86,6 +86,7 @@ enum vctrs_type vec_typeof(SEXP x);
 enum vctrs_type vec_proxy_typeof(SEXP x);
 const char* vec_type_as_str(enum vctrs_type type);
 bool vec_is_vector(SEXP x);
+bool vec_is_tabular(SEXP x);
 bool vec_is_partial(SEXP x);
 
 // After adding a new `vctrs_dispatch` type, add the missing entries
@@ -203,6 +204,7 @@ enum vctrs_proxy_kind {
 SEXP vec_proxy(SEXP x);
 SEXP vec_proxy_equal(SEXP x);
 SEXP vec_proxy_recursive(SEXP x, enum vctrs_proxy_kind kind);
+SEXP vec_proxy_pop_vcols(SEXP* proxy_out);
 SEXP vec_restore(SEXP x, SEXP to, SEXP i);
 R_len_t vec_size(SEXP x);
 R_len_t vec_size_common(SEXP xs, R_len_t absent);
@@ -235,6 +237,15 @@ SEXP vec_type2(SEXP x,
 
 bool is_data_frame(SEXP x);
 bool is_record(SEXP x);
+
+// Tabular API
+void tbl_assert(SEXP x, struct vctrs_arg* arg);
+R_len_t tbl_size(SEXP x);
+SEXP tbl_slice(SEXP x, SEXP index);
+SEXP tbl_ptype(SEXP x);
+SEXP tbl_ptype2(SEXP x, SEXP y, struct vctrs_arg* x_arg, struct vctrs_arg* y_arg);
+SEXP tbl_cast(SEXP x, SEXP to, struct vctrs_arg* x_arg, struct vctrs_arg* to_arg);
+SEXP tbl_ptype_common(SEXP dots, SEXP ptype);
 
 R_len_t df_size(SEXP x);
 R_len_t df_rownames_size(SEXP x);

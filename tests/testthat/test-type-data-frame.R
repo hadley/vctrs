@@ -1,5 +1,14 @@
 context("test-type-data-frame")
 
+test_that("new_data_frame() handles custom row names", {
+  exp <- data.frame(x = 1:3)
+  row.names(exp) <- letters[1:3]
+
+  out <- new_data_frame(list(x = 1:3), row_names = letters[1:3])
+  expect_identical(out, exp)
+})
+
+
 # printing ----------------------------------------------------------------
 
 test_that("data frames print nicely", {
@@ -175,4 +184,82 @@ test_that("df_as_dataframe() checks for names", {
 test_that("can slice AsIs class", {
   df <- data.frame(x = I(1:3), y = I(list(4, 5, 6)))
   expect_identical(vec_slice(df, 2:3), unrownames(df[2:3, ]))
+})
+
+test_that("common tabular type of data frames is a data frame of the same size", {
+  df1 <- data_frame(x = 1:3)
+  df2 <- data_frame(y = 4:6)
+  expect_identical(tbl_ptype2(df1, df2), new_data_frame(n = 3L))
+  expect_identical(tbl_ptype2(df2, df1), new_data_frame(n = 3L))
+})
+
+test_that("data frames of incompatible size don't have a common tabular type", {
+  df1 <- data_frame(w = 1:3)
+  df2 <- data_frame(x = 1:4)
+  df3 <- data_frame(y = 1)
+  df4 <- data_frame(z = 4:6)
+  df_ptype <- tbl_ptype(df1)
+
+  expect_error(tbl_ptype2(df1, df2), class = "vctrs_error_incompatible_size")
+  expect_error(tbl_ptype2(df2, df1), class = "vctrs_error_incompatible_size")
+
+  expect_identical(tbl_ptype2(df1, df3), df_ptype)
+  expect_identical(tbl_ptype2(df3, df1), df_ptype)
+
+  expect_identical(tbl_ptype2(df1, df4), df_ptype)
+  expect_identical(tbl_ptype2(df4, df1), df_ptype)
+})
+
+test_that("data frames with incompatible row names don't have a common tabular type", {
+  df1 <- data_frame(x = 1:3)
+  df2 <- data_frame(y = 4:6)
+  row.names(df1) <- letters[1:3]
+  row.names(df2) <- letters[4:6]
+
+  expect_error(tbl_ptype2(df1, df2), "row names must be compatible")
+  expect_error(tbl_ptype2(df2, df1), "row names must be compatible")
+
+  row.names(df2) <- row.names(df1)
+  expect_identical(tbl_ptype2(df1, df2), tbl_ptype(df1))
+  expect_identical(tbl_ptype2(df2, df1), tbl_ptype(df1))
+
+  df3 <- data_frame(z = 1L)
+  row.names(df3) <- "a"
+  expect_error(tbl_ptype2(df1, df3), "row names must be compatible")
+  expect_error(tbl_ptype2(df3, df1), "row names must be compatible")
+})
+
+test_that("can cast to tabular type", {
+  expect_identical(tbl_cast(mtcars, mtcars), mtcars)
+  expect_identical(tbl_cast(mtcars[1:3], mtcars), mtcars[1:3])
+
+  new_sub_df <- function(x) {
+    structure(x, class = c("df_subclass", "data.frame"))
+  }
+  local_methods(
+    tbl_ptype2.df_subclass = function(x, y, ...) {
+      new_sub_df(tbl_ptype2.data.frame.data.frame(x, y))
+    }
+  )
+
+  sub_df <- new_sub_df(mtcars)
+  expect_identical(tbl_cast(sub_df, mtcars), mtcars)
+  expect_error(tbl_cast(mtcars, sub_df), class = "vctrs_error_incompatible_cast")
+})
+
+test_that("can cast to data frame tabular type", {
+  df1 <- data_frame(w = 1:3, x = 4:6)
+  df2 <- data_frame(y = 7, z = 8)
+
+  expect_error(tbl_cast(df1, df2), class = "vctrs_error_recycle_incompatible_size")
+  expect_identical(tbl_cast(df2, df1), vec_recycle(df2, 3L))
+})
+
+test_that("row names of base data frames are preserved upon restoration", {
+  bare_mtcars <- mtcars
+  row.names(bare_mtcars) <- 101:132
+  expect_identical(
+    vec_restore(bare_mtcars, mtcars),
+    bare_mtcars
+  )
 })

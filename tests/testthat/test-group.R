@@ -199,3 +199,17 @@ test_that("vec_group_pos works with different encodings", {
   encs <- encodings()
   expect_identical(nrow(vec_group_pos(encs)), 1L)
 })
+
+test_that("vec_group_pos_as_id() expands list of indices", {
+  expect_identical(
+    vec_group_pos_as_id(list(int(1, 3), int(2, 5, 6), 4L)),
+    int(1, 2, 1, 3, 2, 2)
+  )
+})
+
+test_that("vec_group_id_as_pos() collapses to list of indices", {
+  expect_identical(
+    vec_group_id_as_pos(int(1, 3, 1, 2), 4),
+    list(int(1, 3), int(4), int(2), int())
+  )
+})

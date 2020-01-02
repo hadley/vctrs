@@ -3,14 +3,26 @@
 \name{new_data_frame}
 \alias{new_data_frame}
 \alias{vec_ptype2.data.frame}
+\alias{tbl_ptype2.data.frame}
 \alias{vec_cast.data.frame}
+\alias{tbl_cast.data.frame}
 \title{Data frame class}
 \usage{
-new_data_frame(x = list(), n = NULL, ..., class = character())
+new_data_frame(
+  x = list(),
+  n = NULL,
+  ...,
+  class = character(),
+  row_names = NULL
+)
 
 \method{vec_ptype2}{data.frame}(x, y, ...)
 
+\method{tbl_ptype2}{data.frame}(x, y, ..., x_arg = "x", y_arg = "y")
+
 \method{vec_cast}{data.frame}(x, to, ...)
+
+\method{tbl_cast}{data.frame}(x, to, ..., x_arg = "x", to_arg = "to")
 }
 \arguments{
 \item{x}{A named list of equal-length vectors. The lengths are not
@@ -21,6 +33,8 @@ equal.}
 the first element of \code{x}.}
 
 \item{..., class}{Additional arguments for creating subclasses.}
+
+\item{row_names}{Row names.}
 }
 \description{
 A \code{data.frame} \code{\link[=data.frame]{data.frame()}} is a list with "row.names" attribute. Each

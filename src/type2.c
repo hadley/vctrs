@@ -90,9 +90,14 @@ SEXP vec_type2(SEXP x, SEXP y,
   case vctrs_type2_dataframe_dataframe:
     return df_type2(x, y, x_arg, y_arg);
 
-  default:
-    return vctrs_type2_dispatch(x, y, x_arg, y_arg);
-  }
+  default: {
+    x = PROTECT(vec_type(x));
+    y = PROTECT(vec_type(y));
+    SEXP out = vctrs_type2_dispatch(x, y, x_arg, y_arg);
+
+    UNPROTECT(2);
+    return out;
+  }}
 }
 
 

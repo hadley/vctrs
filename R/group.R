@@ -68,6 +68,28 @@ vec_group_id <- function(x) {
 vec_group_pos <- function(x) {
   .Call(vctrs_group_pos, x)
 }
+vec_group_pos_as_id <- function(x) {
+  stopifnot(is_list(x), every(x, is_integer))
+
+  n <- sum(lengths(x))
+  out <- vec_init(integer(), n)
+
+  for (i in seq_along(x)) {
+    loc <- x[[i]]
+    vec_slice(out, loc) <- i
+  }
+
+  out
+}
+vec_group_id_as_pos <- function(groups, n_groups) {
+  groups <- vec_split(seq_along(groups), groups)
+
+  # Remove list-of class. This should be unnecessary soon.
+  groups$val <- as.list(groups$val)
+
+  out <- rep(list(int()), n_groups)
+  vec_assign(out, groups$key, groups$val)
+}
 
 #' @rdname vec_group
 #' @export

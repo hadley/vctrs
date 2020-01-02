@@ -53,7 +53,11 @@ SEXP vctrs_dispatch4(SEXP fn_sym, SEXP fn,
                      SEXP y_sym, SEXP y,
                      SEXP z_sym, SEXP z);
 
+
+SEXP r_get(SEXP x, R_len_t i);
+
 SEXP map(SEXP x, SEXP (*fn)(SEXP));
+SEXP map2(SEXP x, SEXP y, SEXP (*fn)(SEXP, SEXP));
 SEXP df_map(SEXP df, SEXP (*fn)(SEXP));
 
 enum vctrs_class_type class_type(SEXP x);
@@ -87,7 +91,6 @@ SEXP get_rownames(SEXP x);
 bool is_native_df(SEXP x);
 bool is_compact_rownames(SEXP x);
 R_len_t compact_rownames_length(SEXP x);
-SEXP df_container_type(SEXP x);
 SEXP df_poke(SEXP x, R_len_t i, SEXP value);
 SEXP df_poke_at(SEXP x, SEXP name, SEXP value);
 
@@ -210,6 +213,29 @@ SEXP r_as_data_frame(SEXP x);
 static inline void r_dbg_save(SEXP x, const char* name) {
   Rf_defineVar(Rf_install(name), x, R_GlobalEnv);
 }
+static inline void r_dbg_str(SEXP x) {
+  SEXP call = PROTECT(Rf_lang2(Rf_install("str"), x));
+  Rf_eval(call, R_GlobalEnv);
+  UNPROTECT(1);
+}
+
+SEXP r_node_reverse(SEXP node);
+
+static inline void r_node_push(SEXP* node_out, SEXP elt, PROTECT_INDEX i) {
+  SEXP node = Rf_cons(elt, *node_out);
+  REPROTECT(node, i);
+  *node_out = node;
+}
+static inline SEXP r_node_pop(SEXP* node_out, PROTECT_INDEX i) {
+  SEXP node = *node_out;
+
+  SEXP out = CAR(node);
+  node = CDR(node);
+  REPROTECT(node, i);
+
+  *node_out = node;
+  return out;
+}
 
 
 extern SEXP vctrs_ns_env;
@@ -241,6 +267,7 @@ extern SEXP strings_pos;
 extern SEXP strings_val;
 extern SEXP strings_group;
 extern SEXP strings_length;
+extern SEXP strings_vcols;
 
 extern SEXP syms_i;
 extern SEXP syms_n;

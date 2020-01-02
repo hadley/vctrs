@@ -10,6 +10,11 @@
     s3_register("vctrs::vec_ptype2.tbl_df", "default")
     s3_register("vctrs::vec_ptype2.tbl_df", "data.frame")
     s3_register("vctrs::vec_ptype2.data.frame", "tbl_df")
+
+    s3_register("vctrs::tbl_ptype2", "tbl_df")
+    s3_register("vctrs::tbl_ptype2.tbl_df", "default")
+    s3_register("vctrs::tbl_ptype2.tbl_df", "data.frame")
+    s3_register("vctrs::tbl_ptype2.data.frame", "tbl_df")
   }
 
   utils::globalVariables("vec_set_attributes")

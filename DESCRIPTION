@@ -1,6 +1,6 @@
 Package: vctrs
 Title: Vector Helpers
-Version: 0.2.99.9000
+Version: 0.2.99.9001
 Authors@R: 
     c(person(given = "Hadley",
              family = "Wickham",
@@ -34,6 +34,7 @@ Suggests:
     bit64,
     covr,
     crayon,
+    dplyr,
     generics,
     knitr,
     pillar (>= 1.4.1),

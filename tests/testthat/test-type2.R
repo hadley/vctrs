@@ -157,3 +157,15 @@ test_that("vec_is_subtype() determines subtyping relationship", {
   expect_true(vec_is_subtype(foobar(TRUE), lgl()))
   expect_false(vec_is_subtype(lgl(), foobar(TRUE)))
 })
+
+test_that("vec_ptype2() slices inputs before OO dispatch", {
+  lhs <- NULL
+  rhs <- NULL
+  local_methods(
+    vec_ptype2.vctrs_foobar = function(x, y, ...) { lhs <<- x; rhs <<- y }
+  )
+  vec_ptype2(foobar(1:3), foobar(TRUE))
+
+  expect_identical(vec_size(lhs), 0L)
+  expect_identical(vec_size(rhs), 0L)
+})

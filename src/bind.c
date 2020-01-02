@@ -59,6 +59,8 @@ static SEXP vec_rbind(SEXP xs, SEXP ptype, SEXP names_to, enum name_repair_arg n
     Rf_errorcall(R_NilValue, "Can't bind objects that are not coercible to a data frame.");
   }
 
+  SEXP proxy = PROTECT_N(vec_proxy(ptype), &nprot);
+
   // Find individual input sizes and total size of output
   R_len_t nrow = 0;
 
@@ -72,7 +74,7 @@ static SEXP vec_rbind(SEXP xs, SEXP ptype, SEXP names_to, enum name_repair_arg n
     ns[i] = size;
   }
 
-  SEXP out = PROTECT_N(vec_init(ptype, nrow), &nprot);
+  SEXP out = PROTECT_N(vec_init(proxy, nrow), &nprot);
   SEXP idx = PROTECT_N(compact_seq(0, 0, true), &nprot);
   int* idx_ptr = INTEGER(idx);
 
@@ -103,7 +105,11 @@ static SEXP vec_rbind(SEXP xs, SEXP ptype, SEXP names_to, enum name_repair_arg n
       continue;
     }
 
+    // First cast, then take proxy, to give a chance to proxy methods
+    // to instrument elements (e.g. wrap in data frame columns with meta-data)
     SEXP tbl = PROTECT(vec_cast(VECTOR_ELT(xs, i), ptype, args_empty, args_empty));
+    tbl = PROTECT(vec_proxy(tbl));
+
     init_compact_seq(idx_ptr, counter, size, true);
     df_assign(out, idx, tbl, false);
 
@@ -114,12 +120,14 @@ static SEXP vec_rbind(SEXP xs, SEXP ptype, SEXP names_to, enum name_repair_arg n
     }
 
     counter += size;
-    UNPROTECT(1);
+    UNPROTECT(2);
   }
 
   if (names_to != R_NilValue) {
-    out = df_poke_at(out, names_to, names_to_col);
+    out = PROTECT_N(df_poke_at(out, names_to, names_to_col), &nprot);
   }
+
+  out = vec_restore(out, ptype, R_NilValue);
 
   UNPROTECT(nprot);
   return out;
@@ -184,9 +192,8 @@ SEXP vctrs_as_df_row(SEXP x, SEXP quiet) {
   return as_df_row(x, name_repair_unique, LOGICAL(quiet)[0]);
 }
 
-static SEXP as_df_col(SEXP x, SEXP outer, bool* allow_pack);
+static SEXP as_df_col(SEXP x, SEXP outer);
 static SEXP vec_cbind(SEXP xs, SEXP ptype, SEXP size, enum name_repair_arg name_repair);
-static SEXP cbind_container_type(SEXP x);
 
 // [[ register(external = TRUE) ]]
 SEXP vctrs_cbind(SEXP call, SEXP op, SEXP args, SEXP env) {
@@ -200,6 +207,9 @@ SEXP vctrs_cbind(SEXP call, SEXP op, SEXP args, SEXP env) {
   enum name_repair_arg repair_arg = validate_bind_name_repair(name_repair, true);
   SEXP out = vec_cbind(xs, ptype, size, repair_arg);
 
+  // Reset visibility
+  Rf_eval(R_NilValue, R_EmptyEnv);
+
   UNPROTECT(4);
   return out;
 }
@@ -207,64 +217,80 @@ SEXP vctrs_cbind(SEXP call, SEXP op, SEXP args, SEXP env) {
 static SEXP vec_cbind(SEXP xs, SEXP ptype, SEXP size, enum name_repair_arg name_repair) {
   R_len_t n = Rf_length(xs);
 
-  // Find the common container type of inputs
-  SEXP containers = PROTECT(map(xs, &cbind_container_type));
-  ptype = PROTECT(cbind_container_type(ptype));
+  // Transform all inputs to data frames. Inputs are packed in a
+  // df-col if a name was supplied.
+  SEXP dfs;
+  SEXP xs_names = PROTECT(Rf_shallow_duplicate(r_names(xs)));
+  dfs = PROTECT(map2(xs, xs_names, &as_df_col));
 
-  SEXP type = PROTECT(vctrs_type_common_impl(containers, ptype));
-  if (type == R_NilValue) {
-    type = new_data_frame(vctrs_shared_empty_list, 0);
-  } else if (!is_data_frame(type)) {
-    type = r_as_data_frame(type);
+  PROTECT_INDEX ptype_pi;
+  PROTECT_WITH_INDEX(ptype, &ptype_pi);
+
+  if (ptype != R_NilValue) {
+    // FIXME: is this needed?
+    ptype = as_df_col(ptype, R_NilValue);
+    REPROTECT(ptype, ptype_pi);
   }
-  UNPROTECT(1);
-  PROTECT(type);
+  ptype = PROTECT(tbl_ptype_common(dfs, ptype));
 
+  if (ptype == R_NilValue) {
+    ptype = new_data_frame(vctrs_shared_empty_list, 0);
+  } else if (!is_data_frame(ptype)) {
+    ptype = r_as_data_frame(ptype);
+  }
+  REPROTECT(ptype, ptype_pi);
 
-  R_len_t nrow;
+  R_len_t n_rows;
   if (size == R_NilValue) {
-    nrow = vec_size_common(xs, 0);
+    n_rows = vec_size_common(xs, 0);
   } else {
-    nrow = size_validate(size, ".size");
+    n_rows = size_validate(size, ".size");
   }
 
+  ptype = vec_recycle(ptype, n_rows);
+  REPROTECT(ptype, ptype_pi);
 
-  // Convert inputs to data frames, validate, and collect total number of columns
-  SEXP xs_names = PROTECT(r_names(xs));
-  bool has_names = xs_names != R_NilValue;
-  SEXP* xs_names_p = has_names ? STRING_PTR(xs_names) : NULL;
+  SEXP proxies = PROTECT(Rf_allocVector(VECSXP, n));
 
-  R_len_t ncol = 0;
+  PROTECT_INDEX vcols_pi;
+  SEXP vcols = R_NilValue;
+  PROTECT_WITH_INDEX(vcols, &vcols_pi);
+
+  R_len_t n_cols = 0;
+  R_len_t n_vcols = 0;
+
+  // In the first pass we cast to the common tabular type and collect
+  // the number of columns of the output and the table proxies
   for (R_len_t i = 0; i < n; ++i) {
-    SEXP x = VECTOR_ELT(xs, i);
-
-    if (x == R_NilValue) {
+    SEXP df = VECTOR_ELT(dfs, i);
+    if (df == R_NilValue) {
       continue;
     }
 
-    x = PROTECT(vec_recycle(x, nrow));
+    df = PROTECT(tbl_cast(df, ptype, args_empty, args_empty));
 
-    SEXP outer_name = has_names ? xs_names_p[i] : strings_empty;
-    bool allow_packing;
-    x = PROTECT(as_df_col(x, outer_name, &allow_packing));
+    SEXP proxy = PROTECT(vec_proxy(df));
+    SEXP proxy_vcols = PROTECT(vec_proxy_pop_vcols(&proxy));
+    PROTECT(proxy);
 
-    // Remove outer name of column vectors because they shouldn't be repacked
-    if (has_names && !allow_packing) {
-      SET_STRING_ELT(xs_names, i, strings_empty);
+    if (proxy_vcols != R_NilValue) {
+      r_node_push(&vcols, proxy_vcols, vcols_pi);
+      n_vcols += Rf_length(proxy_vcols);
     }
 
-    SET_VECTOR_ELT(xs, i, x);
-    UNPROTECT(2);
+    SET_VECTOR_ELT(proxies, i, proxy);
 
-    // Named inputs are packed in a single column
-    R_len_t x_ncol = outer_name == strings_empty ? Rf_length(x) : 1;
-    ncol += x_ncol;
+    n_cols += Rf_length(proxy);
+    UNPROTECT(4);
   }
 
+  if (vcols != R_NilValue) {
+    n_cols += 1;
+  }
 
   // Fill in columns
-  SEXP out = PROTECT(Rf_allocVector(VECSXP, ncol));
-  SEXP names = PROTECT(Rf_allocVector(STRSXP, ncol));
+  SEXP out = PROTECT(Rf_allocVector(VECSXP, n_cols));
+  SEXP names = PROTECT(Rf_allocVector(STRSXP, n_cols));
 
   SEXP idx = PROTECT(compact_seq(0, 0, true));
   int* idx_ptr = INTEGER(idx);
@@ -272,84 +298,106 @@ static SEXP vec_cbind(SEXP xs, SEXP ptype, SEXP size, enum name_repair_arg name_
   R_len_t counter = 0;
 
   for (R_len_t i = 0; i < n; ++i) {
-    SEXP x = VECTOR_ELT(xs, i);
-
-    if (x == R_NilValue) {
+    SEXP proxy = VECTOR_ELT(proxies, i);
+    if (proxy == R_NilValue) {
       continue;
     }
 
-    SEXP outer_name = has_names ? xs_names_p[i] : strings_empty;
-    if (outer_name != strings_empty) {
-      SET_VECTOR_ELT(out, counter, x);
-      SET_STRING_ELT(names, counter, outer_name);
-      ++counter;
-      continue;
+    R_len_t proxy_n = Rf_length(proxy);
+
+    init_compact_seq(idx_ptr, counter, proxy_n, true);
+    list_assign(out, idx, proxy, false);
+
+    SEXP proxy_names = PROTECT(r_names(proxy));
+    if (proxy_names != R_NilValue) {
+      chr_assign(names, idx, proxy_names, false);
     }
-
-    R_len_t xn = Rf_length(x);
-    init_compact_seq(idx_ptr, counter, xn, true);
-    list_assign(out, idx, x, false);
-
-    SEXP xnms = PROTECT(r_names(x));
-    if (xnms != R_NilValue) {
-      chr_assign(names, idx, xnms, false);
-    }
-
-    counter += xn;
     UNPROTECT(1);
+
+    counter += proxy_n;
+  }
+
+  if (vcols != R_NilValue) {
+    vcols = r_node_reverse(vcols);
+    REPROTECT(vcols, vcols_pi);
+
+    SEXP new_vcols = PROTECT(Rf_allocVector(VECSXP, n_vcols));
+    SEXP new_vcols_names = PROTECT(Rf_allocVector(STRSXP, n_vcols));
+    Rf_setAttrib(new_vcols, R_NamesSymbol, new_vcols_names);
+    init_data_frame(new_vcols, n_rows);
+
+    R_len_t i = 0;
+    while (vcols != R_NilValue) {
+      SEXP vcols_elt = CAR(vcols);
+      SEXP vcols_elt_names = PROTECT(r_names(vcols_elt));
+
+      R_len_t n_elt = Rf_length(vcols_elt);
+      for (R_len_t j = 0; j < n_elt; ++j) {
+        SET_VECTOR_ELT(new_vcols, i, VECTOR_ELT(vcols_elt, j));
+        SET_STRING_ELT(new_vcols_names, i, STRING_ELT(vcols_elt_names, j));
+        ++i;
+      }
+
+      UNPROTECT(1);
+      vcols = CDR(vcols);
+    }
+
+    SET_VECTOR_ELT(out, n_cols - 1, new_vcols);
+    SET_STRING_ELT(names, n_cols - 1, strings_vcols);
+    UNPROTECT(2);
   }
 
   names = PROTECT(vec_as_names(names, name_repair, false));
   Rf_setAttrib(out, R_NamesSymbol, names);
+  out = vec_restore(out, ptype, R_NilValue);
 
-  out = vec_restore(out, type, R_NilValue);
-
-  UNPROTECT(8);
+  UNPROTECT(10);
   return out;
 }
 
-static SEXP cbind_container_type(SEXP x) {
-  if (is_data_frame(x)) {
-    return df_container_type(x);
-  } else {
-    return R_NilValue;
-  }
-}
-
-
-static SEXP shaped_as_df_col(SEXP x, SEXP outer);
+static SEXP packed_as_df_col(SEXP x, SEXP outer);
+static SEXP mat_as_data_frame(SEXP x, SEXP outer);
 static SEXP vec_as_df_col(SEXP x, SEXP outer);
 
 // [[ register() ]]
 SEXP vctrs_as_df_col(SEXP x, SEXP outer) {
-  bool allow_pack;
-  return as_df_col(x, r_chr_get(outer, 0), &allow_pack);
+  return as_df_col(x, r_chr_get(outer, 0));
 }
-static SEXP as_df_col(SEXP x, SEXP outer, bool* allow_pack) {
-  if (is_data_frame(x)) {
-    *allow_pack = true;
-    return Rf_shallow_duplicate(x);
-  }
-
-  R_len_t ndim = vec_bare_dim_n(x);
-  if (ndim > 2) {
-    Rf_errorcall(R_NilValue, "Can't bind arrays.");
-  }
-  if (ndim > 0) {
-    *allow_pack = true;
-    return shaped_as_df_col(x, outer);
-  }
-
-  *allow_pack = false;
-  return vec_as_df_col(x, outer);
-}
-
-static SEXP shaped_as_df_col(SEXP x, SEXP outer) {
-  // If packed, store array as a column
-  if (outer != strings_empty) {
+static SEXP as_df_col(SEXP x, SEXP outer) {
+  if (x == R_NilValue) {
     return x;
   }
 
+  bool is_df = is_data_frame(x);
+  R_len_t ndim = vec_bare_dim_n(x);
+  bool is_vec = !is_df && ndim == 0;
+
+  if (ndim > 2) {
+    Rf_errorcall(R_NilValue, "Can't bind arrays.");
+  }
+
+  // Packed inputs, including matrices and data frames, are stored as column
+  outer = (outer == R_NilValue) ? strings_empty : outer;
+  bool packed = (outer != strings_empty);
+
+  if (is_vec || packed) {
+    if (is_df || ndim > 0) {
+      return packed_as_df_col(x, outer);
+    } else {
+      return vec_as_df_col(x, outer);
+    }
+  } else {
+    if (is_df) {
+      return x;
+    } else if (ndim > 0) {
+      return mat_as_data_frame(x, outer);
+    } else {
+      Rf_error("Internal error: Bare vector should have been packed.");
+    }
+  }
+}
+
+static SEXP mat_as_data_frame(SEXP x, SEXP outer) {
   // If unpacked, transform to data frame first. We repair names
   // after unpacking and concatenation.
   SEXP out = PROTECT(r_as_data_frame(x));
@@ -363,19 +411,29 @@ static SEXP shaped_as_df_col(SEXP x, SEXP outer) {
   return out;
 }
 
+static SEXP packed_as_df_col(SEXP x, SEXP outer) {
+  SEXP out = PROTECT(Rf_allocVector(VECSXP, 1));
+  SET_VECTOR_ELT(out, 0, x);
+
+  SEXP names = PROTECT(r_str_as_character(outer));
+  Rf_setAttrib(out, R_NamesSymbol, names);
+
+  init_data_frame(out, vec_size(x));
+
+  UNPROTECT(2);
+  return out;
+}
+
 static SEXP vec_as_df_col(SEXP x, SEXP outer) {
   SEXP out = PROTECT(Rf_allocVector(VECSXP, 1));
   SET_VECTOR_ELT(out, 0, x);
 
-  if (outer != strings_empty) {
-    SEXP names = PROTECT(r_str_as_character(outer));
-    Rf_setAttrib(out, R_NamesSymbol, names);
-    UNPROTECT(1);
-  }
+  SEXP names = PROTECT(r_str_as_character(outer));
+  Rf_setAttrib(out, R_NamesSymbol, names);
 
   init_data_frame(out, Rf_length(x));
 
-  UNPROTECT(1);
+  UNPROTECT(2);
   return out;
 }
 

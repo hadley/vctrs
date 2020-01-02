@@ -83,6 +83,14 @@ extern SEXP vctrs_apply_name_spec(SEXP, SEXP, SEXP, SEXP);
 extern SEXP vctrs_proxy_recursive(SEXP, SEXP);
 extern SEXP vctrs_maybe_translate_encoding(SEXP);
 extern SEXP vctrs_maybe_translate_encoding2(SEXP, SEXP);
+extern SEXP vctrs_tbl_is(SEXP);
+extern SEXP vctrs_tbl_assert(SEXP, SEXP);
+extern SEXP tbl_slice(SEXP, SEXP);
+extern SEXP tbl_ptype(SEXP);
+extern SEXP vctrs_tbl_ptype2(SEXP, SEXP, SEXP, SEXP);
+extern SEXP vctrs_tbl_ptype_common(SEXP, SEXP);
+extern SEXP vctrs_tbl_cast(SEXP, SEXP, SEXP, SEXP);
+extern SEXP vctrs_tbl_size(SEXP);
 
 // Very experimental
 // Available in the API header
@@ -185,6 +193,13 @@ static const R_CallMethodDef CallEntries[] = {
   {"vctrs_maybe_translate_encoding",   (DL_FUNC) &vctrs_maybe_translate_encoding, 1},
   {"vctrs_maybe_translate_encoding2",  (DL_FUNC) &vctrs_maybe_translate_encoding2, 2},
   {"vctrs_rle",                        (DL_FUNC) &altrep_rle_Make, 1},
+  {"vctrs_tbl_is",                     (DL_FUNC) &vctrs_tbl_is, 1},
+  {"vctrs_tbl_assert",                 (DL_FUNC) &vctrs_tbl_assert, 2},
+  {"vctrs_tbl_slice",                  (DL_FUNC) &tbl_slice, 2},
+  {"vctrs_tbl_ptype",                  (DL_FUNC) &tbl_ptype, 1},
+  {"vctrs_tbl_ptype2",                 (DL_FUNC) &vctrs_tbl_ptype2, 4},
+  {"vctrs_tbl_cast",                   (DL_FUNC) &vctrs_tbl_cast, 4},
+  {"vctrs_tbl_size",                   (DL_FUNC) &vctrs_tbl_size, 1},
   {NULL, NULL, 0}
 };
 
@@ -201,6 +216,7 @@ static const R_ExternalMethodDef ExtEntries[] = {
   {"vctrs_size_common",                (DL_FUNC) &vctrs_size_common, 2},
   {"vctrs_recycle_common",             (DL_FUNC) &vctrs_recycle_common, 1},
   {"vctrs_cast_common",                (DL_FUNC) &vctrs_cast_common, 1},
+  {"vctrs_tbl_ptype_common",           (DL_FUNC) &vctrs_tbl_ptype_common, 2},
   {"vctrs_rbind",                      (DL_FUNC) &vctrs_rbind, 3},
   {"vctrs_cbind",                      (DL_FUNC) &vctrs_cbind, 3},
   {"vctrs_c",                          (DL_FUNC) &vctrs_c, 3},
@@ -247,6 +263,7 @@ void vctrs_init_names(SEXP ns);
 void vctrs_init_proxy_restore(SEXP ns);
 void vctrs_init_slice(SEXP ns);
 void vctrs_init_slice_assign(SEXP ns);
+void vctrs_init_table(SEXP ns);
 void vctrs_init_type2(SEXP ns);
 void vctrs_init_type(SEXP ns);
 void vctrs_init_type_info(SEXP ns);
@@ -261,6 +278,7 @@ SEXP vctrs_init_library(SEXP ns) {
   vctrs_init_proxy_restore(ns);
   vctrs_init_slice(ns);
   vctrs_init_slice_assign(ns);
+  vctrs_init_table(ns);
   vctrs_init_type2(ns);
   vctrs_init_type(ns);
   vctrs_init_type_info(ns);

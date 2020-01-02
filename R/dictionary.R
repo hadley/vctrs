@@ -226,6 +226,9 @@ vec_unique_count <- function(x) {
 vec_match <- function(needles, haystack) {
   .Call(vctrs_match, needles, haystack)
 }
+vec_match_all <- function(needles, haystack) {
+  map(vec_chop(needles), function(needle) which(vec_equal(needle, haystack)))
+}
 
 #' @export
 #' @rdname vec_match

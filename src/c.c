@@ -79,9 +79,9 @@ static SEXP vec_c(SEXP xs,
       continue;
     }
 
-    // TODO
     SEXP x = VECTOR_ELT(xs, i);
     SEXP elt = PROTECT(vec_cast(x, ptype, args_empty, args_empty));
+    elt = PROTECT(vec_proxy(elt));
 
     init_compact_seq(idx_ptr, counter, size, true);
 
@@ -105,7 +105,7 @@ static SEXP vec_c(SEXP xs,
     }
 
     counter += size;
-    UNPROTECT(1);
+    UNPROTECT(2);
   }
 
   out = vec_restore(out, ptype, R_NilValue);

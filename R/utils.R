@@ -121,3 +121,8 @@ new_opts <- function(x, opts, subclass = NULL, arg = NULL) {
     class = c(subclass, "vctrs_opts")
   )
 }
+
+unstructure <- function(x) {
+  attributes(x) <- NULL
+  x
+}

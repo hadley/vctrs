@@ -8,7 +8,7 @@ static SEXP fns_vec_is_vector_dispatch = NULL;
 
 // From proxy.c
 SEXP vec_proxy_method(SEXP x);
-SEXP vec_proxy_invoke(SEXP x, SEXP method);
+SEXP vec_proxy_invoke(SEXP x);
 
 
 static enum vctrs_type vec_base_typeof(SEXP x, bool proxied);
@@ -38,7 +38,7 @@ struct vctrs_proxy_info vec_proxy_info(SEXP x) {
     info.type = vec_base_typeof(x, false);
     info.proxy = x;
   } else {
-    SEXP proxy = PROTECT(vec_proxy_invoke(x, info.proxy_method));
+    SEXP proxy = PROTECT(vec_proxy_invoke(x));
     info.type = vec_base_typeof(proxy, true);
     info.proxy = proxy;
     UNPROTECT(1);

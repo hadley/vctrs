@@ -86,3 +86,8 @@ vec_ptype2.POSIXt.vctrs_unspecified <- function(x, y, ...) vec_ptype(x)
 #' @method vec_ptype2.difftime vctrs_unspecified
 #' @export
 vec_ptype2.difftime.vctrs_unspecified <- function(x, y, ...) vec_ptype(x)
+
+#' @export
+vec_cast.vctrs_unspecified <- function(x, to, ...) {
+  vec_cast(x, unclass(to), ...)
+}
