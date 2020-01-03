@@ -49,3 +49,8 @@ test_that("vec_restore restores tibbles", {
 
   expect_s3_class(df2, "tbl_df")
 })
+
+test_that("tibbles have common tabular type with data frames", {
+  expect_identical(tbl_ptype2(tibble::tibble(x = 1), mtcars), tibble::tibble())
+  expect_identical(tbl_ptype2(mtcars, tibble::tibble(x = 1)), tibble::tibble())
+})

@@ -105,6 +105,59 @@ vec_ptype2.data.frame.default <- function(x, y, ..., x_arg = "x", y_arg = "y") {
   vec_default_ptype2(x, y, x_arg = x_arg, y_arg = y_arg)
 }
 
+#' @rdname new_data_frame
+#' @export tbl_ptype2.data.frame
+#' @method tbl_ptype2 data.frame
+#' @export
+tbl_ptype2.data.frame <- function(x, y, ..., x_arg = "x", y_arg = "y") {
+  tbl_assert(y, y_arg)
+  if (inherits_only(x, "data.frame")) {
+    UseMethod("tbl_ptype2.data.frame", y)
+  } else {
+    stop_incompatible_type(x, y, x_arg = x_arg, y_arg = y_arg)
+  }
+}
+#' @method tbl_ptype2.data.frame data.frame
+#' @export
+tbl_ptype2.data.frame.data.frame <- function(x, y, ..., x_arg = "x", y_arg = "y") {
+  if (inherits_only(y, "data.frame")) {
+    tbl_ptype2_base(x, y, x_arg = x_arg, y_arg = y_arg)
+  } else {
+    stop_incompatible_type(x, y, x_arg = x_arg, y_arg = y_arg)
+  }
+}
+#' @method tbl_ptype2.data.frame default
+#' @export
+tbl_ptype2.data.frame.default <- function(x, y, ..., x_arg = "x", y_arg = "y") {
+  vec_default_ptype2(x, y, x_arg = x_arg, y_arg = y_arg)
+}
+
+# Works with any subclasses of data frame
+tbl_ptype2_base <- function(x, y, ..., x_arg = "x", y_arg = "y") {
+  recycled <- vec_recycle_common(x = x, y = y)
+
+  rows_x <- row_names(recycled$x)
+  rows_y <- row_names(recycled$y)
+  if (!identical(rows_x, rows_y) &&
+        !identical(sort(rows_x), sort(rows_y))) {
+    abort(c(
+      "Can't find common rectangle type for these data frames.",
+      x = "The row names must be compatible."
+    ))
+  }
+
+  tbl_ptype(recycled$x)
+}
+
+# Like row.names() but returns NULL for unset row names
+row_names <- function(x) {
+  if (.row_names_info(x) < 0L) {
+    NULL
+  } else {
+    attr(x, "row.names")
+  }
+}
+
 
 # Cast --------------------------------------------------------------------
 
@@ -136,6 +189,36 @@ vec_restore.data.frame <- function(x, to, ..., n = NULL) {
   .Call(vctrs_df_restore, x, to, n)
 }
 
+
+#' @rdname new_data_frame
+#' @export tbl_cast.data.frame
+#' @method tbl_cast data.frame
+#' @export
+tbl_cast.data.frame <- function(x, to, ..., x_arg = "x", to_arg = "to") {
+  if (inherits_only(to, "data.frame")) {
+    UseMethod("tbl_cast.data.frame")
+  } else {
+    vec_default_cast(x, to, x_arg = x_arg, to_arg = to_arg)
+  }
+}
+#' @export
+#' @method tbl_cast.data.frame data.frame
+tbl_cast.data.frame.data.frame <- function(x, to, ...) {
+  # This is a departure from vector casting which is currently more
+  # liberal. Casting requires existence of a common type,
+  # e.g. compatible row names.
+  ptype <- tbl_ptype2(x, to)
+
+  x <- as.data.frame.data.frame(x)
+  x <- vec_recycle(x, vec_size(to))
+
+  x
+}
+#' @export
+#' @method tbl_cast.data.frame default
+tbl_cast.data.frame.default <- function(x, to, ..., x_arg = "x", to_arg = "to") {
+  vec_default_cast(x, to, x_arg = x_arg, to_arg = to_arg)
+}
 
 # AsIS --------------------------------------------------------------------
 

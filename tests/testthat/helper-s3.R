@@ -1,5 +1,6 @@
 
 foobar <- function(x = list()) structure(x, class = "vctrs_foobar")
+tbl_foobar <- function(x = list()) structure(x, class = c("vctrs_foobar", "data.frame"))
 
 unrownames <- function(x) {
   row.names(x) <- NULL

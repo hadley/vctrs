@@ -211,7 +211,7 @@ static SEXP vec_cbind(SEXP xs, SEXP ptype, SEXP size, enum name_repair_arg name_
   SEXP containers = PROTECT(map(xs, &cbind_container_type));
   ptype = PROTECT(cbind_container_type(ptype));
 
-  SEXP type = PROTECT(vctrs_type_common_impl(containers, ptype));
+  SEXP type = PROTECT(tbl_ptype_common(containers, ptype));
   if (type == R_NilValue) {
     type = new_data_frame(vctrs_shared_empty_list, 0);
   } else if (!is_data_frame(type)) {
