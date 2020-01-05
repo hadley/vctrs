@@ -404,6 +404,144 @@ test_that("vec_slice() asserts vectorness (#301)", {
 })
 
 
+# vec_get -----------------------------------------------------------------
+
+test_that("vec_get throws error with non-vector inputs", {
+  expect_error(vec_get(environment(), 1L), class = "vctrs_error_scalar_type")
+})
+
+test_that("cannot extract more than one element", {
+  expect_error(vec_get(1, 1:2), class = "vctrs_error_position_bad_type")
+})
+
+test_that("can extract from atomic vectors", {
+  i <- 2L
+  expect_identical(vec_get(lgl(1, 0, 1), i), lgl(0))
+  expect_identical(vec_get(int(1, 2, 3), i), int(2))
+  expect_identical(vec_get(dbl(1, 2, 3), i), dbl(2))
+  expect_identical(vec_get(cpl(1, 2, 3), i), cpl(2))
+  expect_identical(vec_get(chr("1", "2", "3"), i), chr("2"))
+  expect_identical(vec_get(bytes(1, 2, 3), i), bytes(2))
+})
+
+test_that("can extract from a list", {
+  expect_identical(vec_get(list(1, 2, 3), 2L), 2)
+})
+
+test_that("can extract from shaped atomic vectors", {
+  i <- 2L
+  mat <- as.matrix
+  expect_identical(vec_get(mat(lgl(1, 0, 1)), i), mat(lgl(0)))
+  expect_identical(vec_get(mat(int(1, 2, 3)), i), mat(int(2)))
+  expect_identical(vec_get(mat(dbl(1, 2, 3)), i), mat(dbl(2)))
+  expect_identical(vec_get(mat(cpl(1, 2, 3)), i), mat(cpl(2)))
+  expect_identical(vec_get(mat(chr("1", "2", "3")), i), mat(chr("2")))
+  expect_identical(vec_get(mat(bytes(1, 2, 3)), i), mat(bytes(2)))
+})
+
+test_that("can extract from a shaped list", {
+  x <- matrix(list(1, 2, 3, 4), nrow = 2)
+  expect <- matrix(list(2, 4), nrow = 1)
+  expect_identical(vec_get(x, 2), expect)
+})
+
+test_that("can extract object of any dimensionality", {
+  x0 <- c(1, 1)
+  x1 <- ones(2)
+  x2 <- ones(2, 3)
+  x3 <- ones(2, 3, 4)
+  x4 <- ones(2, 3, 4, 5)
+
+  expect_equal(vec_get(x0, 1L), 1)
+  expect_identical(vec_get(x1, 1L), ones(1))
+  expect_identical(vec_get(x2, 1L), ones(1, 3))
+  expect_identical(vec_get(x3, 1L), ones(1, 3, 4))
+  expect_identical(vec_get(x4, 1L), ones(1, 3, 4, 5))
+})
+
+test_that("can extract from data frames row wise", {
+  df <- data.frame(x = 1:2, y = c("a", "b"))
+  expect_equal(vec_get(df, 1), vec_slice(df, 1))
+})
+
+test_that("can extract from data frames with data frame columns", {
+  df <- data.frame(x = 1:2)
+  df$y <- data.frame(a = 2:1)
+  expect_equal(vec_get(df, 1), vec_slice(df, 1))
+})
+
+test_that("names are lost from atomics", {
+  x <- set_names(1:2)
+  expect_equal(names(vec_get(x, 1)), NULL)
+})
+
+test_that("row names are lost from data frames", {
+  df <- data.frame(x = 1:2, row.names = c("r1", "r2"))
+  expect_equal(rownames(vec_get(df, 1)), "1")
+  expect_equal(.row_names_info(vec_get(df, 1)), -1)
+})
+
+test_that("row names are lost from matrices / arrays", {
+  x <- array(1, c(2, 2, 2), dimnames = list(c("r1", "r2")))
+  expect_equal(rownames(vec_get(x, 1)), NULL)
+})
+
+test_that("non-row names are kept on matrices / arrays", {
+  dim_names <- list(c("r1", "r2"), c("c1", "c2"), c("d1", "d2"))
+  x <- array(1, c(2, 2, 2), dimnames = dim_names)
+
+  expect <- dim_names
+  expect[1] <- list(NULL)
+
+  expect_equal(dimnames(vec_get(x, 1)), expect)
+})
+
+# TODO - Is this right?
+test_that("dimname names are kept on the 1st dimension", {
+  x <- array(1, c(2, 2), dimnames = list(kept = c("r1", "r2")))
+  expect_equal(dimnames(vec_get(x, 1)), list(kept = NULL, NULL))
+})
+
+test_that("row names are lost from shaped S3 objects", {
+  dim_names <- list(c("r1", "r2"), c("c1", "c2"))
+  x <- structure(1:4, dim = c(2L, 2L), dimnames = dim_names, class = "vctrs_mat")
+
+  expect_equal(dimnames(vec_get(x, 1)), list(NULL, c("c1", "c2")))
+})
+
+test_that("vec_get() falls back to `[[` with S3 objects", {
+  local_methods(
+    `[[.vctrs_foobar` = function(x, i, ...) "dispatched"
+  )
+  expect_identical(vec_get(foobar(NA), 1), foobar("dispatched"))
+})
+
+test_that("can extract from S3 lists that implement a proxy", {
+  expect_error(vec_get(foobar(list(NA)), 1), class = "vctrs_error_scalar_type")
+
+  local_methods(
+    vec_proxy.vctrs_foobar = identity
+  )
+
+  expect_identical(vec_get(foobar(list(NA)), 1), NA)
+})
+
+test_that("vec_get() doesn't restore when attributes have already been restored", {
+  local_methods(
+    `[[.vctrs_foobar` = function(x, i, ...) structure("dispatched", foo = "bar"),
+    vec_restore.vctrs_foobar = function(...) stop("not called")
+  )
+  expect_error(vec_get(foobar(NA), 1), NA)
+})
+
+test_that("vec_restore() is called after extracting from data frames", {
+  local_methods(
+    vec_restore.vctrs_tabble = function(...) "dispatched"
+  )
+  df <- structure(mtcars, class = c("vctrs_tabble", "data.frame"))
+  expect_identical(vec_get(df, 1), "dispatched")
+})
+
 # vec_init ----------------------------------------------------------------
 
 test_that("na of atomic vectors is as expected", {

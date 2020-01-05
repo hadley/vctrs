@@ -249,6 +249,7 @@ extern SEXP syms_y;
 extern SEXP syms_to;
 extern SEXP syms_dots;
 extern SEXP syms_bracket;
+extern SEXP syms_bracket_bracket;
 extern SEXP syms_x_arg;
 extern SEXP syms_y_arg;
 extern SEXP syms_to_arg;
@@ -267,6 +268,7 @@ extern SEXP syms_size;
 #define syms_names R_NamesSymbol
 
 extern SEXP fns_bracket;
+extern SEXP fns_bracket_bracket;
 extern SEXP fns_quote;
 extern SEXP fns_names;
 

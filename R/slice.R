@@ -125,6 +125,11 @@ vec_assign_fallback <- function(x, i, value) {
   x
 }
 
+vec_get <- function(x, i) {
+  i <- vec_as_position(i, vec_size(x), vec_names(x))
+  .Call(vctrs_get, x, i)
+}
+
 #' Create an index vector or a position
 #'
 #' @description
