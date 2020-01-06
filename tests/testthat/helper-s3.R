@@ -52,3 +52,22 @@ subclass <- function(x) {
   class(x) <- c("vctrs_foo", "vctrs_foobar", class(x))
   x
 }
+
+
+local_vcols_methods <- function(frame = caller_env()) {
+  local_methods(.frame = frame,
+    vec_proxy.vctrs_virtual = function(x, ...) {
+      vec_proxy_push_vcols(x, `mypkg::groups` = attr(x, "groups"))
+    },
+    vec_restore.vctrs_virtual = function(x, ...) {
+      parts <- vec_proxy_pop_vcols(x, "mypkg::groups")
+      new_vcols(
+        parts$proxy,
+        groups = parts$vcols$`mypkg::groups`
+      )
+    }
+  )
+}
+new_vcols <- function(x, groups) {
+  structure(x, class = c("vctrs_virtual", "data.frame"), groups = groups)
+}

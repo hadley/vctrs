@@ -116,3 +116,62 @@ vec_restore_dispatch <- function(x, to, ..., n = NULL) {
 vec_restore.default <- function(x, to, ..., n = NULL) {
   .Call(vctrs_restore_default, x, to)
 }
+
+
+vec_proxy_push_vcols <- function(x, ...) {
+  stopifnot(is.data.frame(x))
+  size <- nrow(x)
+
+  # Prevent S3 dispatch
+  x <- as.list(x)
+
+  vcols <- list2(...)
+  stopifnot(every(vcols, function(x) vec_size(x) == size))
+
+  n <- length(x)
+  has_vcols <- length(x) && identical(names(x)[[n]], "vctrs::virtual_cols")
+  if (has_vcols) {
+    vcols <- c(x[[n]], vcols)
+    x <- x[-n]
+  }
+
+  x <- c(x, list(`vctrs::virtual_cols` = new_data_frame(vcols)))
+  new_data_frame(x)
+}
+
+vec_proxy_pop_vcols <- function(x, names) {
+  stopifnot(is.data.frame(x))
+
+  # Prevent S3 dispatch
+  x <- as.list(x)
+
+  n <- length(x)
+  has_vcols <- identical(names(x)[[n]], "vctrs::virtual_cols")
+
+  if (!has_vcols) {
+    abort("Internal error: Expected virtual column in proxy.")
+  }
+
+  # Transform to list to prevent deduplication of column names
+  vcols <- as.list(x[[n]])
+
+  ind <- names(vcols) == names
+  if (!any(ind)) {
+    abort("Internal error: Can't find virtual column in proxy.")
+  }
+
+  out <- vcols[ind]
+
+  # If no vcol left, pop the vcols column from the proxy. Otherwise,
+  # pop the relevant vcols.
+  if (all(ind)) {
+    x <- x[-n]
+  } else {
+    x[[n]] <- new_data_frame(vcols[!ind])
+  }
+
+  data_frame(
+    proxy = new_data_frame(x),
+    vcols = new_data_frame(out)
+  )
+}
