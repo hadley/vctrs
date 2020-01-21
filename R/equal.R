@@ -3,7 +3,7 @@
 #' Returns a proxy object (i.e. an atomic vector or data frame of atomic
 #' vectors). For [vctr]s, this determines the behaviour of `==` and
 #' `!=` (via [vec_equal()]); [unique()], [duplicated()] (via
-#' [vec_unique()] and [vec_duplicate_detect()]); [is.na()] and [anyNA()]
+#' [vec_unique()] and [vec_duplicate_flg()]); [is.na()] and [anyNA()]
 #' (via [vec_equal_na()]).
 #'
 #' The default method calls [vec_proxy()], as the default underlying

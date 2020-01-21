@@ -128,7 +128,7 @@ SEXP vctrs_minimal_names(SEXP x) {
 
 
 // From dictionary.c
-SEXP vctrs_duplicated(SEXP x);
+SEXP vec_duplicate_flg(SEXP x, bool first);
 
 static bool any_has_suffix(SEXP names);
 static SEXP as_unique_names_impl(SEXP names, bool quiet);
@@ -214,7 +214,7 @@ SEXP as_unique_names_impl(SEXP names, bool quiet) {
 
   // Append all duplicates with a suffix
 
-  SEXP dups = PROTECT(vctrs_duplicated(new_names));
+  SEXP dups = PROTECT(vec_duplicate_flg(new_names, true));
   const int* dups_ptr = LOGICAL_RO(dups);
 
   for (R_len_t i = 0; i < n; ++i) {

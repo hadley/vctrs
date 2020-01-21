@@ -66,7 +66,7 @@ vec_type2 <- function(x, y, ...) {
 vec_as_index <- function(i, n, names = NULL) {
   signal_soft_deprecated(paste_line(
     "`vec_as_index()` is deprecated as of vctrs 0.2.2.",
-    "Please use `vec_as_location() instead.`"
+    "Please use `vec_as_location()` instead."
   ))
   n <- vec_coercible_cast(n, integer())
   vec_assert(n, integer(), 1L)
@@ -82,4 +82,48 @@ vec_as_index <- function(i, n, names = NULL) {
     missing = "propagate",
     arg = NULL
   )
+}
+
+#' Locate first occurrences
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{vctrs:::lifecycle("soft-deprecated")}
+#'
+#' `vec_duplicate_id()` has been renamed to [vec_first_loc()] and is
+#' soft-deprecated as of vctrs 0.2.2.
+#'
+#' @inheritParams vec_first_loc
+#'
+#' @keywords internal
+#' @export
+vec_duplicate_id <- function(x) {
+  signal_soft_deprecated(paste_line(
+    "`vec_duplicate_id()` is deprecated as of vctrs 0.2.2.",
+    "Please use `vec_first_loc()` instead."
+  ))
+
+  vec_first_loc(x)
+}
+
+#' Detect duplicate values
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{vctrs:::lifecycle("soft-deprecated")}
+#'
+#' `vec_duplicate_detect()` has been renamed to [vec_duplicate_flg()] and is
+#' soft-deprecated as of vctrs 0.2.2.
+#'
+#' @inheritParams vec_duplicate_flg
+#'
+#' @keywords internal
+#' @export
+vec_duplicate_detect <- function(x) {
+  signal_soft_deprecated(paste_line(
+    "`vec_duplicate_detect()` is deprecated as of vctrs 0.2.2.",
+    "Please use `vec_duplicate_flg()` instead."
+  ))
+
+  vec_duplicate_flg(x, first = TRUE)
 }

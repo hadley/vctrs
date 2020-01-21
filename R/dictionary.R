@@ -78,12 +78,10 @@ reset_rownames <- function(x) {
 #' * `vec_duplicate_any()`: detects the presence of duplicated values,
 #'   similar to [anyDuplicated()].
 #' * `vec_duplicate_all()`: detects if all values are equivalent.
-#' * `vec_duplicate_detect()`: returns a logical vector describing if each
-#'   element of the vector is duplicated elsewhere. Unlike [duplicated()], it
-#'   reports all duplicated values, not just the second and subsequent
-#'   repetitions.
-#' * `vec_duplicate_id()`: returns an integer vector giving the location of
-#'   the first occurrence of the value.
+#' * `vec_duplicate_flg()`: returns a vector of logical flags describing if each
+#'   element of the vector is a duplicate.
+#' * `vec_duplicate_loc()`: returns an integer vector giving the location of
+#'   the duplicates of each value.
 #'
 #' @section Missing values:
 #' In most cases, missing values are not considered to be equal, i.e.
@@ -92,11 +90,14 @@ reset_rownames <- function(x) {
 #' all `NaN` are also considered to be equal.)
 #'
 #' @param x A vector (including a data frame).
+#' @param first A logical indicating if the first occurrence of a value should
+#'   be considered a duplicate.
 #' @return
 #'   * `vec_duplicate_any()`: a logical vector of length 1.
 #'   * `vec_duplicate_all()`: a logical vector of length 1.
-#'   * `vec_duplicate_detect()`: a logical vector the same length as `x`.
-#'   * `vec_duplicate_id()`: an integer vector the same length as `x`.
+#'   * `vec_duplicate_flg()`: a logical vector the same size as `x`.
+#'   * `vec_duplicate_loc()`: an integer vector of the locations of the
+#'     duplicates of each value.
 #' @seealso [vec_unique()] for functions that work with the dual of duplicated
 #'   values: unique values.
 #' @name vec_duplicate
@@ -109,18 +110,24 @@ reset_rownames <- function(x) {
 #' vec_duplicate_all(c(NA, NA))
 #'
 #' x <- c(10, 10, 20, 30, 30, 40)
-#' vec_duplicate_detect(x)
-#' # Note that `duplicated()` doesn't consider the first instance to
-#' # be a duplicate
+#'
+#' # The default of `vec_duplicate_flg()` is similar to `duplicated()`. Both
+#' # don't consider the first occurrence to be a duplicate.
+#' vec_duplicate_flg(x)
 #' duplicated(x)
 #'
-#' # Identify elements of a vector by the location of the first element that
-#' # they're equal to:
-#' vec_duplicate_id(x)
-#' # Location of the unique values:
+#' # Use `first` to control whether or not the first occurrence should be
+#' # considered a duplicate
+#' vec_duplicate_flg(x, first = TRUE)
+#'
+#' # `vec_duplicate_loc()` returns the locations corresponding to
+#' # the flags that `vec_duplicate_flg()` returns
+#' vec_duplicate_loc(x)
+#' which(vec_duplicate_flg(x))
+#'
+#' # When `first = FALSE`, it can be considered the
+#' # complement of `vec_unique_loc()`
 #' vec_unique_loc(x)
-#' # Equivalent to `duplicated()`:
-#' vec_duplicate_id(x) == seq_along(x)
 NULL
 
 #' @rdname vec_duplicate
@@ -131,14 +138,16 @@ vec_duplicate_any <- function(x) {
 
 #' @rdname vec_duplicate
 #' @export
-vec_duplicate_detect <- function(x) {
-  .Call(vctrs_duplicated, x)
+vec_duplicate_flg <- function(x, first = FALSE) {
+  vec_assert(first, ptype = logical(), size = 1L)
+  .Call(vctrs_duplicate_flg, x, first)
 }
 
 #' @rdname vec_duplicate
 #' @export
-vec_duplicate_id <- function(x) {
-  .Call(vctrs_id, x)
+vec_duplicate_loc <- function(x, first = FALSE) {
+  vec_assert(first, ptype = logical(), size = 1L)
+  .Call(vctrs_duplicate_loc, x, first)
 }
 
 # Unique values -----------------------------------------------------------
@@ -192,6 +201,40 @@ vec_unique_count <- function(x) {
   .Call(vctrs_n_distinct, x)
 }
 
+# First location ----------------------------------------------------------
+
+#' Locate first occurrences
+#'
+#' `vec_first_loc()` returns an integer vector giving, for each element of `x`,
+#' the location of its first occurrence.
+#'
+#' While `vec_unique_loc()` and `vec_duplicate_loc()` return _only_ the
+#' locations of the unique and duplicate values respectively, `vec_first_loc()`
+#' returns a vector the same size as `x` with locations corresponding to the
+#' first occurrence of each value.
+#'
+#' @inherit vec_duplicate sections
+#' @param x A vector (including a data frame).
+#' @return An integer vector the same size as `x`.
+#'
+#' @export
+#' @examples
+#' x <- c(10, 10, 20, 30, 30, 40)
+#'
+#' vec_first_loc(x)
+#'
+#' # Compare with `vec_unique_loc()`, which returns locations
+#' # for only the unique values
+#' vec_unique_loc(x)
+#'
+#' # And `vec_duplicate_loc()`, which returns locations for only the
+#' # duplicate values
+#' vec_duplicate_loc(x)
+#'
+#' vec_first_loc(c(NA, NA, NaN, NaN))
+vec_first_loc <- function(x) {
+  .Call(vctrs_first_loc, x)
+}
 
 # Matching ----------------------------------------------------------------
 

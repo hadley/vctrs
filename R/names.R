@@ -305,7 +305,7 @@ as_universal_names <- function(names, quiet = FALSE) {
 
   new_names[!empty] <- make_syntactic(naked_names[!empty])
 
-  needs_suffix <- empty | vec_duplicate_detect(new_names)
+  needs_suffix <- empty | vec_duplicate_flg(new_names, first = TRUE)
   new_names <- append_pos(new_names, needs_suffix = needs_suffix)
 
   if (!quiet) {

@@ -1,6 +1,13 @@
 
 # vctrs 0.2.99.9000
 
+* `vec_duplicate_detect()` has been renamed to `vec_duplicate_flg()`.
+
+* `vec_duplicate_id()` has been renamed to `vec_first_loc()`.
+
+* New `vec_duplicate_loc()` for computing locations of duplicate values in
+  a vector.
+
 * `vec_ptype2()` methods for base classes now prevent
   inheritance. This makes sense because the subtyping graph created by
   `vec_ptype2()` methods is generally not the same as the inheritance

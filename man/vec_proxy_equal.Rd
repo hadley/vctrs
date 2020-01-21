@@ -18,7 +18,7 @@ A 1d atomic vector or a data frame.
 Returns a proxy object (i.e. an atomic vector or data frame of atomic
 vectors). For \link{vctr}s, this determines the behaviour of \code{==} and
 \code{!=} (via \code{\link[=vec_equal]{vec_equal()}}); \code{\link[=unique]{unique()}}, \code{\link[=duplicated]{duplicated()}} (via
-\code{\link[=vec_unique]{vec_unique()}} and \code{\link[=vec_duplicate_detect]{vec_duplicate_detect()}}); \code{\link[=is.na]{is.na()}} and \code{\link[=anyNA]{anyNA()}}
+\code{\link[=vec_unique]{vec_unique()}} and \code{\link[=vec_duplicate_flg]{vec_duplicate_flg()}}); \code{\link[=is.na]{is.na()}} and \code{\link[=anyNA]{anyNA()}}
 (via \code{\link[=vec_equal_na]{vec_equal_na()}}).
 }
 \details{
