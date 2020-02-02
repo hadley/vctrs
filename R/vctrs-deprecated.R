@@ -83,3 +83,25 @@ vec_as_index <- function(i, n, names = NULL) {
     arg = NULL
   )
 }
+
+#' Detect if any values are duplicates
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{vctrs:::lifecycle("soft-deprecated")}
+#'
+#' `vec_duplicate_any()` has been renamed to [vec_any_duplicate()] and is
+#' soft-deprecated as of vctrs 0.3.0.
+#'
+#' @inheritParams vec_any_duplicate
+#'
+#' @keywords internal
+#' @export
+vec_duplicate_any <- function(x) {
+  signal_soft_deprecated(paste_line(
+    "`vec_duplicate_any()` is deprecated as of vctrs 0.3.0.",
+    "Please use `vec_any_duplicate()` instead."
+  ))
+
+  vec_any_duplicate(x)
+}

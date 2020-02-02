@@ -52,9 +52,9 @@ test_that("vec_duplicated reports on duplicates regardless of position", {
   expect_equal(vec_duplicate_detect(x), c(TRUE, TRUE, FALSE, FALSE, TRUE, TRUE))
 })
 
-test_that("vec_duplicate_any returns single TRUE/FALSE", {
-  expect_false(vec_duplicate_any(c(1:10)))
-  expect_true(vec_duplicate_any(c(1:10, 1)))
+test_that("vec_any_duplicate returns single TRUE/FALSE", {
+  expect_false(vec_any_duplicate(c(1:10)))
+  expect_true(vec_any_duplicate(c(1:10, 1)))
 })
 
 test_that("vec_duplicate_id gives position of first found", {
@@ -139,7 +139,7 @@ test_that("duplicate functions take the equality proxy recursively", {
   x <- tuple(c(1, 1, 2), 1:3)
   df <- data_frame(x = x)
 
-  expect_equal(vec_duplicate_any(df), TRUE)
+  expect_equal(vec_any_duplicate(df), TRUE)
   expect_equal(vec_duplicate_detect(df), c(TRUE, TRUE, FALSE))
   expect_equal(vec_duplicate_id(df), c(1, 1, 3))
 })
@@ -171,7 +171,7 @@ test_that("duplicate functions works with different encodings", {
 
   expect_equal(vec_duplicate_id(encs), rep(1, 3))
   expect_equal(vec_duplicate_detect(encs), rep(TRUE, 3))
-  expect_equal(vec_duplicate_any(encs), TRUE)
+  expect_equal(vec_any_duplicate(encs), TRUE)
 })
 
 test_that("vec_unique() returns differently encoded strings in the order they appear", {
@@ -225,7 +225,7 @@ test_that("matching functions take the equality proxy (#375)", {
   expect_identical(vec_unique_loc(x), 1:2)
   expect_identical(unique(x), tuple(c(1, 2), 1:2))
 
-  expect_true(vec_duplicate_any(x))
+  expect_true(vec_any_duplicate(x))
   expect_identical(vec_duplicate_id(x), c(1L, 2L, 1L))
   expect_identical(vec_unique_count(x), 2L)
 

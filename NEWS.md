@@ -1,3 +1,6 @@
+# vctrs 0.2.2.9000
+
+* `vec_duplicate_any()` has been renamed to `vec_any_duplicate()`.
 
 # vctrs (development version)
 

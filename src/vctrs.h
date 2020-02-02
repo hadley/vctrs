@@ -266,7 +266,7 @@ int compare_scalar(SEXP x, R_len_t i, SEXP y, R_len_t j, bool na_equal);
 uint32_t hash_object(SEXP x);
 void hash_fill(uint32_t* p, R_len_t n, SEXP x);
 
-bool duplicated_any(SEXP names);
+bool any_duplicate(SEXP names);
 
 // Rowwise operations -------------------------------------------
 

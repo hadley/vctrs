@@ -385,7 +385,7 @@ duplicated.vctrs_vctr <- function(x, incomparables = FALSE, ...) {
 
 #' @export
 anyDuplicated.vctrs_vctr <- function(x, incomparables = FALSE, ...) {
-  vec_duplicate_any(x)
+  vec_any_duplicate(x)
 }
 
 # Comparison ----------------------------------------------------------------

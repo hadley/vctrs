@@ -141,13 +141,13 @@ SEXP vctrs_unique_loc(SEXP x) {
   return out;
 }
 
-SEXP vctrs_duplicated_any(SEXP x) {
-  bool out = duplicated_any(x);
+SEXP vctrs_any_duplicate(SEXP x) {
+  bool out = any_duplicate(x);
   return Rf_ScalarLogical(out);
 }
 
 // [[ include("vctrs.h") ]]
-bool duplicated_any(SEXP x) {
+bool any_duplicate(SEXP x) {
   int nprot = 0;
 
   R_len_t n = vec_size(x);

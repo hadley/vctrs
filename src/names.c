@@ -155,7 +155,7 @@ bool is_unique_names(SEXP names) {
   R_len_t n = Rf_length(names);
   const SEXP* names_ptr = STRING_PTR_RO(names);
 
-  if (duplicated_any(names)) {
+  if (any_duplicate(names)) {
     return false;
   }
 
