@@ -1,3 +1,7 @@
+# vctrs 0.2.2.9000
+
+* New `vec_all_equal()` for detecting if all values between two vectors are
+  equivalent.
 
 # vctrs (development version)
 

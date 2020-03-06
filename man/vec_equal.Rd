@@ -2,10 +2,13 @@
 % Please edit documentation in R/equal.R
 \name{vec_equal}
 \alias{vec_equal}
+\alias{vec_all_equal}
 \alias{vec_equal_na}
 \title{Test if two vectors are equal}
 \usage{
 vec_equal(x, y, na_equal = FALSE, .ptype = NULL)
+
+vec_all_equal(x, y, na_equal = FALSE, ptype = NULL)
 
 vec_equal_na(x)
 }
@@ -17,9 +20,17 @@ vec_equal_na(x)
 \item{na_equal}{Should \code{NA} values be considered equal?}
 
 \item{.ptype}{Override to optionally specify common type}
+
+\item{ptype}{Override to optionally specify common type}
 }
 \value{
-A logical vector the same size as. Will only contain \code{NA}s if \code{na_equal} is \code{FALSE}.
+\itemize{
+\item \code{vec_equal()}: a logical vector the same size as the common size of \code{x}
+and \code{y}. It will only contain \code{NA}s if \code{na_equal} is \code{FALSE}.
+\item \code{vec_equal_na()}: a logical vector the same size as \code{x}.
+\item \code{vec_all_equal()}: a logical vector of size 1. It can only be
+\code{NA} if \code{na_equal} is \code{FALSE}.
+}
 }
 \description{
 \code{vec_equal_na()} tests a special case: equality with \code{NA}. It is similar to
@@ -31,6 +42,8 @@ is missing.
 This preserves the invariant that \code{vec_equal_na(x)} is equal to
 \code{vec_equal(x, vec_init(x), na_equal = TRUE)}.
 }
+
+\code{vec_all_equal()} tests if all elements are equal between two vectors.
 }
 \examples{
 vec_equal(c(TRUE, FALSE, NA), FALSE)
@@ -43,4 +56,9 @@ vec_equal("d", letters[1:10])
 df <- data.frame(x = c(1, 1, 2, 1, NA), y = c(1, 2, 1, NA, NA))
 vec_equal(df, data.frame(x = 1, y = 2))
 vec_equal_na(df)
+
+vec_all_equal(c(1, 2), c(1, 2))
+vec_all_equal(c(1, 2), c(1, 3))
+vec_all_equal(c(1, NA), c(1, NA))
+vec_all_equal(c(1, NA), c(1, NA), na_equal = TRUE)
 }

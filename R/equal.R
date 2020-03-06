@@ -38,6 +38,7 @@ vec_proxy_equal.default <- function(x, ...) {
 
 #' Test if two vectors are equal
 #'
+#' @description
 #' `vec_equal_na()` tests a special case: equality with `NA`. It is similar to
 #' [is.na] but:
 #' * Considers the missing element of a list to be `NULL`.
@@ -46,8 +47,15 @@ vec_proxy_equal.default <- function(x, ...) {
 #' This preserves the invariant that `vec_equal_na(x)` is equal to
 #' `vec_equal(x, vec_init(x), na_equal = TRUE)`.
 #'
+#' `vec_all_equal()` tests if all elements are equal between two vectors.
+#'
 #' @inheritParams vec_compare
-#' @return A logical vector the same size as. Will only contain `NA`s if `na_equal` is `FALSE`.
+#' @return
+#'   * `vec_equal()`: a logical vector the same size as the common size of `x`
+#'     and `y`. It will only contain `NA`s if `na_equal` is `FALSE`.
+#'   * `vec_equal_na()`: a logical vector the same size as `x`.
+#'   * `vec_all_equal()`: a logical vector of size 1. It can only be
+#'     `NA` if `na_equal` is `FALSE`.
 #' @export
 #' @examples
 #' vec_equal(c(TRUE, FALSE, NA), FALSE)
@@ -60,11 +68,23 @@ vec_proxy_equal.default <- function(x, ...) {
 #' df <- data.frame(x = c(1, 1, 2, 1, NA), y = c(1, 2, 1, NA, NA))
 #' vec_equal(df, data.frame(x = 1, y = 2))
 #' vec_equal_na(df)
+#'
+#' vec_all_equal(c(1, 2), c(1, 2))
+#' vec_all_equal(c(1, 2), c(1, 3))
+#' vec_all_equal(c(1, NA), c(1, NA))
+#' vec_all_equal(c(1, NA), c(1, NA), na_equal = TRUE)
 vec_equal <- function(x, y, na_equal = FALSE, .ptype = NULL) {
   vec_assert(na_equal, ptype = logical(), size = 1L)
   args <- vec_recycle_common(x, y)
   args <- vec_cast_common(!!!args, .to = .ptype)
   .Call(vctrs_equal, args[[1]], args[[2]], na_equal)
+}
+
+#' @export
+#' @rdname vec_equal
+vec_all_equal <- function(x, y, na_equal = FALSE, ptype = NULL) {
+  vec_assert(na_equal, ptype = logical(), size = 1L)
+  .Call(vctrs_all_equal, x, y, na_equal, ptype)
 }
 
 #' @export
