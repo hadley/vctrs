@@ -3,6 +3,7 @@
 #include "slice.h"
 #include "subscript-loc.h"
 #include "type-data-frame.h"
+#include "altrep-rep.h"
 #include "utils.h"
 
 // Initialised at load time
@@ -68,21 +69,29 @@ SEXP fns_vec_slice_dispatch_integer64 = NULL;
   UNPROTECT(1);                                                 \
   return out
 
-#define SLICE(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE)                   \
-  if (ALTREP(x)) {                                                          \
-    SEXP alt_subscript = PROTECT(compact_materialize(subscript));           \
-    SEXP out = ALTVEC_EXTRACT_SUBSET_PROXY(x, alt_subscript, R_NilValue);   \
-    UNPROTECT(1);                                                           \
-    if (out != NULL) {                                                      \
-      return out;                                                           \
-    }                                                                       \
-  }                                                                         \
-  if (is_compact_rep(subscript)) {                                          \
-    SLICE_COMPACT_REP(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE);          \
-  } else if (is_compact_seq(subscript)) {                                   \
-    SLICE_COMPACT_SEQ(RTYPE, CTYPE, DEREF, CONST_DEREF);                    \
-  } else {                                                                  \
-    SLICE_SUBSCRIPT(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE);            \
+static SEXP vec_slice_maybe_vctrs_compact_rep(SEXP x, SEXP subscript, SEXPTYPE type);
+static SEXP vec_slice_maybe_altrep(SEXP x, SEXP subscript);
+
+#define SLICE(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE)                       \
+  if (ALTREP(x)) {                                                              \
+    SEXP out = vec_slice_maybe_altrep(x, subscript);                            \
+    if (out != NULL) {                                                          \
+      return out;                                                               \
+    }                                                                           \
+  }                                                                             \
+                                                                                \
+  if (is_compact_rep(subscript)) {                                              \
+    if (HAS_ALTREP) {                                                           \
+      SEXP out = vec_slice_maybe_vctrs_compact_rep(x, subscript, RTYPE);        \
+      if (out != R_NilValue) {                                                  \
+        return out;                                                             \
+      }                                                                         \
+    }                                                                           \
+    SLICE_COMPACT_REP(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE);              \
+  } else if (is_compact_seq(subscript)) {                                       \
+    SLICE_COMPACT_SEQ(RTYPE, CTYPE, DEREF, CONST_DEREF);                        \
+  } else {                                                                      \
+    SLICE_SUBSCRIPT(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE);                \
   }
 
 static SEXP lgl_slice(SEXP x, SEXP subscript) {
@@ -251,24 +260,23 @@ SEXP vec_slice_base(enum vctrs_type type, SEXP x, SEXP subscript) {
 }
 
 // Replace any `NA` name caused by `NA` subscript with the empty
-// string. It's ok mutate the names vector since it is freshly
-// created, but we make an additional check for that anyways
-// (and the empty string is persistently protected anyway).
-static void repair_na_names(SEXP names, SEXP subscript) {
-  if (!NO_REFERENCES(names)) {
-    Rf_errorcall(R_NilValue, "Internal error: `names` must not be referenced.");
-  }
-
+// string. `names` is freshly created by `chr_slice()`, but this
+// might generate a `vctrs_altrep_compact_rep_chr` if `subscript`
+// is a compact_rep object. Because of that, we call `r_maybe_duplicate()`
+// to ensure we get a fresh expanded vector we can modify.
+static SEXP repair_na_names(SEXP names, SEXP subscript) {
   // No possible way to have `NA_integer_` in a compact seq
   if (is_compact_seq(subscript)) {
-    return;
+    return names;
   }
 
   R_len_t n = Rf_length(names);
 
   if (n == 0) {
-    return;
+    return names;
   }
+
+  names = PROTECT(r_maybe_duplicate(names));
 
   SEXP* p_names = STRING_PTR(names);
   const int* p_subscript = INTEGER_RO(subscript);
@@ -276,14 +284,16 @@ static void repair_na_names(SEXP names, SEXP subscript) {
   // Special handling for a compact_rep object with repeated `NA`
   if (is_compact_rep(subscript)) {
     if (p_subscript[0] != NA_INTEGER) {
-      return;
+      UNPROTECT(1);
+      return names;
     }
 
     for (R_len_t i = 0; i < n; ++i) {
       p_names[i] = strings_empty;
     }
 
-    return;
+    UNPROTECT(1);
+    return names;
   }
 
   for (R_len_t i = 0; i < n; ++i) {
@@ -291,6 +301,9 @@ static void repair_na_names(SEXP names, SEXP subscript) {
       p_names[i] = strings_empty;
     }
   }
+
+  UNPROTECT(1);
+  return names;
 }
 
 SEXP slice_names(SEXP names, SEXP subscript) {
@@ -299,8 +312,7 @@ SEXP slice_names(SEXP names, SEXP subscript) {
   }
 
   names = PROTECT(chr_slice(names, subscript));
-
-  repair_na_names(names, subscript);
+  names = repair_na_names(names, subscript);
 
   UNPROTECT(1);
   return names;
@@ -470,6 +482,55 @@ SEXP vec_slice_rep(SEXP x, SEXP i, SEXP n) {
   return out;
 }
 
+static SEXP vec_slice_maybe_vctrs_compact_rep(SEXP x, SEXP subscript, SEXPTYPE type) {
+  if (OBJECT(x)) {
+    return R_NilValue;
+  }
+
+  if (ATTRIB(x) != R_NilValue) {
+    return R_NilValue;
+  }
+
+  int* p_subscript = INTEGER(subscript);
+
+  // Location of `compact_rep()` subscripts is 1-based
+  int loc = p_subscript[0];
+  int size = p_subscript[1];
+
+  switch (type) {
+  case INTSXP: {
+    int value = (loc == NA_INTEGER) ? NA_INTEGER : INTEGER(x)[loc - 1];
+    return new_vctrs_compact_rep_int(value, size);
+  }
+  case REALSXP: {
+    double value = (loc == NA_INTEGER) ? NA_REAL : REAL(x)[loc - 1];
+    return new_vctrs_compact_rep_dbl(value, size);
+  }
+  case STRSXP: {
+    SEXP value = (loc == NA_INTEGER) ? NA_STRING : STRING_PTR(x)[loc - 1];
+    return new_vctrs_compact_rep_chr(value, size);
+  }
+#if HAS_ALTREP_3_6
+  case LGLSXP: {
+    int value = (loc == NA_INTEGER) ? NA_LOGICAL : LOGICAL(x)[loc - 1];
+    return new_vctrs_compact_rep_lgl(value, size);
+  }
+#endif
+  default:
+    return R_NilValue;
+  }
+
+  never_reached("vec_slice_maybe_vctrs_compact_rep");
+}
+
+static SEXP vec_slice_maybe_altrep(SEXP x, SEXP subscript) {
+  subscript = PROTECT(compact_materialize(subscript));
+
+  SEXP out = ALTVEC_EXTRACT_SUBSET_PROXY(x, subscript, R_NilValue);
+
+  UNPROTECT(1);
+  return out;
+}
 
 void vctrs_init_slice(SEXP ns) {
   syms_vec_slice_fallback = Rf_install("vec_slice_fallback");

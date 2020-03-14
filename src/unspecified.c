@@ -1,5 +1,6 @@
 #include "vctrs.h"
 #include "utils.h"
+#include "altrep-rep.h"
 
 // Initialised at load time
 static SEXP unspecified_attrib = NULL;
@@ -59,6 +60,11 @@ bool vec_is_unspecified(SEXP x) {
   R_len_t n = Rf_length(x);
   if (n == 0) {
     return false;
+  }
+
+  // Avoid compact_rep expansion from calling LOGICAL()
+  if (vec_is_vctrs_compact_rep_lgl(x)) {
+    return !LOGICAL_NO_NA(x);
   }
 
   R_len_t* p_x = LOGICAL(x);

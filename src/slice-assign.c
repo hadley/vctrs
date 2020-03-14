@@ -1,6 +1,7 @@
 #include "vctrs.h"
 #include "subscript-loc.h"
 #include "utils.h"
+#include "altrep-rep.h"
 
 // Initialised at load time
 SEXP syms_vec_assign_fallback = NULL;
@@ -99,6 +100,61 @@ SEXP vec_proxy_assign(SEXP proxy, SEXP index, SEXP value) {
   return vec_assign_switch(proxy, index, info.proxy);
 }
 
+
+#define ASSIGN_ALTREP_VCTRS_COMPACT_REP(CTYPE, DEREF, ELT)       \
+  R_len_t n = Rf_length(index);                                  \
+  int* index_data = INTEGER(index);                              \
+                                                                 \
+  if (n != Rf_length(value)) {                                   \
+    Rf_error("Internal error in `vec_assign()`: "                \
+             "`value` should have been recycled to fit `x`.");   \
+  }                                                              \
+                                                                 \
+  SEXP out = PROTECT(r_maybe_duplicate(x));                      \
+  CTYPE* out_data = DEREF(out);                                  \
+                                                                 \
+  CTYPE elt;                                                     \
+  if (n > 0) {                                                   \
+    elt = ELT(value, 0);                                         \
+  }                                                              \
+                                                                 \
+  for (R_len_t i = 0; i < n; ++i) {                              \
+    int j = index_data[i];                                       \
+                                                                 \
+    if (j != NA_INTEGER) {                                       \
+      out_data[j - 1] = elt;                                     \
+    }                                                            \
+  }                                                              \
+                                                                 \
+  UNPROTECT(1);                                                  \
+  return out;
+
+#define ASSIGN_ALTREP_VCTRS_COMPACT_REP_COMPACT(CTYPE, DEREF, ELT) \
+  int* index_data = INTEGER(index);                                \
+  R_len_t start = index_data[0];                                   \
+  R_len_t n = index_data[1];                                       \
+  R_len_t step = index_data[2];                                    \
+                                                                   \
+  if (n != Rf_length(value)) {                                     \
+    Rf_error("Internal error in `vec_assign()`: "                  \
+             "`value` should have been recycled to fit `x`.");     \
+  }                                                                \
+                                                                   \
+  CTYPE elt;                                                       \
+  if (n > 0) {                                                     \
+    elt = ELT(value, 0);                                           \
+  }                                                                \
+                                                                   \
+  SEXP out = PROTECT(r_maybe_duplicate(x));                        \
+  CTYPE* out_data = DEREF(out) + start;                            \
+                                                                   \
+  for (int i = 0; i < n; ++i, out_data += step) {                  \
+    *out_data = elt;                                               \
+  }                                                                \
+                                                                   \
+  UNPROTECT(1);                                                    \
+  return out;
+
 #define ASSIGN_INDEX(CTYPE, DEREF, CONST_DEREF)                 \
   R_len_t n = Rf_length(index);                                 \
   int* index_data = INTEGER(index);                             \
@@ -144,35 +200,43 @@ SEXP vec_proxy_assign(SEXP proxy, SEXP index, SEXP value) {
   UNPROTECT(1);                                                 \
   return out
 
-#define ASSIGN(CTYPE, DEREF, CONST_DEREF)       \
-  if (is_compact_seq(index)) {                  \
-    ASSIGN_COMPACT(CTYPE, DEREF, CONST_DEREF);  \
-  } else {                                      \
-    ASSIGN_INDEX(CTYPE, DEREF, CONST_DEREF);    \
+#define ASSIGN(CTYPE, DEREF, CONST_DEREF, ELT)                     \
+  if (vec_is_vctrs_compact_rep(value)) {                           \
+    if (is_compact_seq(index)) {                                   \
+      ASSIGN_ALTREP_VCTRS_COMPACT_REP_COMPACT(CTYPE, DEREF, ELT);  \
+    } else {                                                       \
+      ASSIGN_ALTREP_VCTRS_COMPACT_REP(CTYPE, DEREF, ELT);          \
+    }                                                              \
+  } else if (is_compact_seq(index)) {                              \
+    ASSIGN_COMPACT(CTYPE, DEREF, CONST_DEREF);                     \
+  } else {                                                         \
+    ASSIGN_INDEX(CTYPE, DEREF, CONST_DEREF);                       \
   }
 
 static SEXP lgl_assign(SEXP x, SEXP index, SEXP value) {
-  ASSIGN(int, LOGICAL, LOGICAL_RO);
+  ASSIGN(int, LOGICAL, LOGICAL_RO, LOGICAL_ELT);
 }
 static SEXP int_assign(SEXP x, SEXP index, SEXP value) {
-  ASSIGN(int, INTEGER, INTEGER_RO);
+  ASSIGN(int, INTEGER, INTEGER_RO, INTEGER_ELT);
 }
 static SEXP dbl_assign(SEXP x, SEXP index, SEXP value) {
-  ASSIGN(double, REAL, REAL_RO);
+  ASSIGN(double, REAL, REAL_RO, REAL_ELT);
 }
 static SEXP cpl_assign(SEXP x, SEXP index, SEXP value) {
-  ASSIGN(Rcomplex, COMPLEX, COMPLEX_RO);
+  ASSIGN(Rcomplex, COMPLEX, COMPLEX_RO, COMPLEX_ELT);
 }
 SEXP chr_assign(SEXP x, SEXP index, SEXP value) {
-  ASSIGN(SEXP, STRING_PTR, STRING_PTR_RO);
+  ASSIGN(SEXP, STRING_PTR, STRING_PTR_RO, STRING_ELT);
 }
 static SEXP raw_assign(SEXP x, SEXP index, SEXP value) {
-  ASSIGN(Rbyte, RAW, RAW_RO);
+  ASSIGN(Rbyte, RAW, RAW_RO, RAW_ELT);
 }
 
 #undef ASSIGN
 #undef ASSIGN_INDEX
 #undef ASSIGN_COMPACT
+#undef ASSIGN_ALTREP_VCTRS_COMPACT_REP
+#undef ASSIGN_ALTREP_VCTRS_COMPACT_REP_COMPACT
 
 
 #define ASSIGN_BARRIER_INDEX(GET, SET)                          \
