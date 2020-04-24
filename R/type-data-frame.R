@@ -1,31 +1,31 @@
 #' Data frame class
 #'
-#' A `data.frame` [data.frame()] is a list with "row.names" attribute. Each
+#' A `data.frame` is a list with a "row.names" attribute. Each
 #' element of the list must be named, and of the same length. These functions
-#' help the base data.frame classes fit in to the vctrs type system by
+#' help the base data.frame class fit in to the vctrs type system by
 #' providing constructors, coercion functions, and casting functions.
 #'
-#' @param x A named list of equal-length vectors. The lengths are not
+#' @param .x A named list of equal-length vectors. The lengths are not
 #'   checked; it is responsibility of the caller to make sure they are
 #'   equal.
-#' @param n Number of rows. If `NULL`, will be computed from the length of
-#'   the first element of `x`.
-#' @param ...,class Additional arguments for creating subclasses.
-#'   The `"names"` and `"row.names"` attributes override input in `x` and `n`,
-#'   respectively:
+#' @param .size Number of rows. If `NULL`, will be computed from the length of
+#'   the first element of `.x`.
+#' @param ...,.class Additional arguments for creating subclasses.
+#'   The `"names"` and `"row.names"` attributes override input in `.x` and
+#'   `.size`, respectively:
 #'
-#'   - `"names"` is used if provided, overriding existing names in `x`
-#'   - `"row.names"` is used if provided, if `n` is provided it must be
+#'   - `"names"` is used if provided, overriding existing names in `.x`.
+#'   - `"row.names"` is used if provided, if `.size` is provided it must be
 #'     consistent.
 #'
 #' @export
 #' @keywords internal
 #' @examples
 #' new_data_frame(list(x = 1:10, y = 10:1))
-new_data_frame <- function(x = list(), n = NULL, ..., class = NULL) {
-  .External(vctrs_new_data_frame, x, n, class, ...)
+new_data_frame <- function(.x = list(), ..., .size = NULL, .class = NULL) {
+  .External(vctrs_new_data_frame, .x, .size, .class, ...)
 }
-new_data_frame <- fn_inline_formals(new_data_frame, "x")
+new_data_frame <- fn_inline_formals(new_data_frame, ".x")
 
 
 # Light weight constructor used for tests - avoids having to repeatedly do
@@ -71,7 +71,7 @@ vec_ptype_abbr.data.frame <- function(x, ...) {
 #' @export
 vec_proxy_compare.data.frame <- function(x, ..., relax = FALSE) {
   out <- lapply(as.list(x), vec_proxy_compare, relax = TRUE)
-  new_data_frame(out, nrow(x))
+  new_data_frame(out, .size = nrow(x))
 }
 
 df_is_coercible <- function(x, y) {
@@ -202,12 +202,12 @@ is_df_subclass <- function(x) {
 is_df_fallback <- function(x) {
   inherits(x, "vctrs:::df_fallback")
 }
-new_fallback_df <- function(x, known_classes, n = nrow(x)) {
+new_fallback_df <- function(x, known_classes, size = nrow(x)) {
   new_data_frame(
     x,
-    n = n,
+    .size = size,
     known_classes = known_classes,
-    class = "vctrs:::df_fallback"
+    .class = "vctrs:::df_fallback"
   )
 }
 

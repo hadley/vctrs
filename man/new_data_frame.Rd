@@ -6,33 +6,33 @@
 \alias{vec_cast.data.frame}
 \title{Data frame class}
 \usage{
-new_data_frame(x = list(), n = NULL, ..., class = NULL)
+new_data_frame(.x = list(), ..., .size = NULL, .class = NULL)
 
 \method{vec_ptype2}{data.frame}(x, y, ...)
 
 \method{vec_cast}{data.frame}(x, to, ...)
 }
 \arguments{
-\item{x}{A named list of equal-length vectors. The lengths are not
+\item{.x}{A named list of equal-length vectors. The lengths are not
 checked; it is responsibility of the caller to make sure they are
 equal.}
 
-\item{n}{Number of rows. If \code{NULL}, will be computed from the length of
-the first element of \code{x}.}
-
-\item{..., class}{Additional arguments for creating subclasses.
-The \code{"names"} and \code{"row.names"} attributes override input in \code{x} and \code{n},
-respectively:
+\item{..., .class}{Additional arguments for creating subclasses.
+The \code{"names"} and \code{"row.names"} attributes override input in \code{.x} and
+\code{.size}, respectively:
 \itemize{
-\item \code{"names"} is used if provided, overriding existing names in \code{x}
-\item \code{"row.names"} is used if provided, if \code{n} is provided it must be
+\item \code{"names"} is used if provided, overriding existing names in \code{.x}.
+\item \code{"row.names"} is used if provided, if \code{.size} is provided it must be
 consistent.
 }}
+
+\item{.size}{Number of rows. If \code{NULL}, will be computed from the length of
+the first element of \code{.x}.}
 }
 \description{
-A \code{data.frame} \code{\link[=data.frame]{data.frame()}} is a list with "row.names" attribute. Each
+A \code{data.frame} is a list with a "row.names" attribute. Each
 element of the list must be named, and of the same length. These functions
-help the base data.frame classes fit in to the vctrs type system by
+help the base data.frame class fit in to the vctrs type system by
 providing constructors, coercion functions, and casting functions.
 }
 \examples{

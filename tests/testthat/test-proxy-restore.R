@@ -82,7 +82,7 @@ test_that("arguments are not inlined in the dispatch call (#300)", {
 
 test_that("restoring to non-bare data frames calls `vec_bare_df_restore()` before dispatching", {
   x <- list(x = numeric())
-  to <- new_data_frame(x, class = "tbl_foobar")
+  to <- new_data_frame(x, .class = "tbl_foobar")
 
   local_methods(
     vec_restore.tbl_foobar = function(x, to, ..., n) {

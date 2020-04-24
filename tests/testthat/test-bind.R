@@ -168,12 +168,12 @@ test_that("can rbind unspecified vectors", {
 })
 
 test_that("vec_rbind() respects size invariants (#286)", {
-  expect_identical(vec_rbind(), new_data_frame(n = 0L))
+  expect_identical(vec_rbind(), new_data_frame(.size = 0L))
 
-  expect_identical(vec_rbind(int(), int()), new_data_frame(n = 2L))
+  expect_identical(vec_rbind(int(), int()), new_data_frame(.size = 2L))
   expect_identical(vec_rbind(int(), TRUE), new_data_frame(list(...1 = lgl(NA, TRUE))))
 
-  expect_identical(vec_rbind(int(), new_data_frame(n = 2L), int()), new_data_frame(n = 4L))
+  expect_identical(vec_rbind(int(), new_data_frame(.size = 2L), int()), new_data_frame(.size = 4L))
 })
 
 test_that("can repair names in `vec_rbind()` (#229)", {

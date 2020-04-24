@@ -178,7 +178,7 @@ test_that("restore keeps automatic row/col names", {
 })
 
 test_that("cast to empty data frame preserves number of rows", {
-  out <- vec_cast(new_data_frame(n = 10L), new_data_frame())
+  out <- vec_cast(new_data_frame(.size = 10L), new_data_frame())
   expect_equal(nrow(out), 10L)
 })
 
@@ -233,12 +233,12 @@ test_that("can validly set the number of rows when there are no columns", {
     names = character()
   )
 
-  expect_identical(new_data_frame(n = 2L), expect)
+  expect_identical(new_data_frame(.size = 2L), expect)
 })
 
 test_that("can add additional classes", {
-  expect_s3_class(new_data_frame(class = "foobar"), "foobar")
-  expect_s3_class(new_data_frame(class = c("foo", "bar")), c("foo", "bar"))
+  expect_s3_class(new_data_frame(.class = "foobar"), "foobar")
+  expect_s3_class(new_data_frame(.class = c("foo", "bar")), c("foo", "bar"))
 })
 
 test_that("can add additional attributes", {
@@ -268,24 +268,16 @@ test_that("class attribute", {
     "data.frame"
   )
   expect_identical(
-    class(new_data_frame(list(a = 1), class = "tbl_df")),
+    class(new_data_frame(list(a = 1), .class = "tbl_df")),
     c("tbl_df", "data.frame")
   )
   expect_identical(
-    class(new_data_frame(list(a = 1), class = c("tbl_df", "tbl", "data.frame"))),
+    class(new_data_frame(list(a = 1), .class = c("tbl_df", "tbl", "data.frame"))),
     c("tbl_df", "tbl", "data.frame", "data.frame")
   )
   expect_identical(
-    class(new_data_frame(list(a = 1), class = "foo_frame")),
+    class(new_data_frame(list(a = 1), .class = "foo_frame")),
     c("foo_frame", "data.frame")
-  )
-  expect_identical(
-    class(exec(new_data_frame, list(a = 1), !!!attributes(new_data_frame(list(), class = "tbl_df")))),
-    c("tbl_df", "data.frame", "data.frame")
-  )
-  expect_identical(
-    class(exec(new_data_frame, list(a = 1), !!!attributes(new_data_frame(list(b = 1), class = "tbl_df")))),
-    c("tbl_df", "data.frame", "data.frame")
   )
 })
 
@@ -311,30 +303,30 @@ test_that("attributes with special names are merged", {
   )
 
   expect_identical(
-    .row_names_info(new_data_frame(list(), n = 3L)),
+    .row_names_info(new_data_frame(list(), .size = 3L)),
     -3L
   )
 
-  expect_error(new_data_frame(list(), n = 1L, row.names = 1:3), ".")
+  expect_error(new_data_frame(list(), .size = 1L, row.names = 1:3), ".")
 
   expect_identical(
-    .row_names_info(new_data_frame(list(), n = 3L, row.names = 1:3)),
+    .row_names_info(new_data_frame(list(), .size = 3L, row.names = 1:3)),
     3L
   )
 
   expect_identical(
-    .row_names_info(new_data_frame(list(), n = 3L, row.names = c(NA, -3L))),
+    .row_names_info(new_data_frame(list(), .size = 3L, row.names = c(NA, -3L))),
     -3L
   )
 
   expect_identical(
-    attr(new_data_frame(list(), n = 1L, row.names = "rowname"), "row.names"),
+    attr(new_data_frame(list(), .size = 1L, row.names = "rowname"), "row.names"),
     "rowname"
   )
 })
 
-test_that("n and row.names (#894)", {
-  # Can omit n if row.names attribute is given
+test_that("`.size` and `row.names` (#894)", {
+  # Can omit .size if row.names attribute is given
   expect_identical(
     row.names(new_data_frame(list(), row.names = "rowname")),
     "rowname"
@@ -349,17 +341,17 @@ test_that("n and row.names (#894)", {
   )
 })
 
-test_that("`x` must be a list", {
-  expect_error(new_data_frame(1), "`x` must be a list")
+test_that("`.x` must be a list", {
+  expect_error(new_data_frame(1), "`.x` must be a list")
 })
 
-test_that("if supplied, `n` must be an integer of size 1", {
-  expect_error(new_data_frame(n = c(1L, 2L)), "must be an integer of size 1")
-  expect_error(new_data_frame(n = "x"), "must be an integer of size 1")
+test_that("if supplied, `.size` must be an integer of size 1", {
+  expect_error(new_data_frame(.size = c(1L, 2L)), "must be an integer of size 1")
+  expect_error(new_data_frame(.size = "x"), "must be an integer of size 1")
 })
 
-test_that("`class` must be a character vector", {
-  expect_error(new_data_frame(class = 1), "must be NULL or a character vector")
+test_that("`.class` must be a character vector", {
+  expect_error(new_data_frame(.class = 1), "must be NULL or a character vector")
 })
 
 test_that("flat width is computed", {

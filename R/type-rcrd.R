@@ -183,7 +183,7 @@ as.list.vctrs_rcrd <- function(x, ...) {
 
 #' @export
 vec_proxy_compare.vctrs_rcrd <- function(x, ..., relax = FALSE) {
-  new_data_frame(vec_data(x), n = length(x))
+  new_data_frame(vec_data(x), .size = length(x))
 }
 
 #' @export

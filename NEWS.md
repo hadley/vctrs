@@ -1,6 +1,10 @@
 
 # vctrs (development version)
 
+* The signature of `new_data_frame()` has been changed to avoid collisions
+  when setting attributes with names that are identical to the argument
+  names (#949).
+
 * `new_vctr()` now always appends a base `"list"` class to list `.data` to
   be compatible with changes to `vec_is_list()`. This affects `new_list_of()`,
   which now returns an object with a base class of `"list"`.
@@ -173,7 +177,7 @@
 
 * `POSIXlt` and `POSIXct` vectors are handled more consistently (#901).
 
-* `new_data_frame()` infers size from row names when `n = NULL` (#894).
+* `new_data_frame()` infers size from row names when `.size = NULL` (#894).
 
 
 ## Breaking changes

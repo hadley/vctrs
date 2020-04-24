@@ -239,8 +239,8 @@ test_that("can opt out of NA matching", {
 
 test_that("vec_match works with empty data frame", {
   out <- vec_match(
-    new_data_frame(n = 3L),
-    new_data_frame(n = 0L)
+    new_data_frame(.size = 3L),
+    new_data_frame(.size = 0L)
   )
   expect_equal(out, vec_init(integer(), 3))
 })

@@ -141,7 +141,7 @@ test_that("data frames must have same size and columns", {
 })
 
 test_that("can compare data frames with 0 columns", {
-  x <- new_data_frame(n = 1L)
+  x <- new_data_frame(.size = 1L)
   expect_true(vec_equal(x, x))
 })
 

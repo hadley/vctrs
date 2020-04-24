@@ -168,7 +168,7 @@ test_that("vec_proxy_compare.POSIXlt() correctly orders around DST", {
 })
 
 test_that("error is thrown with data frames with 0 columns", {
-  x <- new_data_frame(n = 1L)
+  x <- new_data_frame(.size = 1L)
   expect_error(vec_compare(x, x), "data frame with zero columns")
 })
 
@@ -288,7 +288,7 @@ test_that("can order data frames with data frame columns (#527)", {
 })
 
 test_that("can order data frames (and subclasses) with matrix columns", {
-  df <- new_data_frame(n = 2L)
+  df <- new_data_frame(.size = 2L)
 
   df$x <- new_data_frame(list(y = matrix(1:2, 2)))
   expect_identical(vec_order(df), 1:2)

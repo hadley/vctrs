@@ -5,7 +5,7 @@
 static SEXP syms_df_lossy_cast = NULL;
 static SEXP fns_df_lossy_cast = NULL;
 
-static SEXP new_compact_rownames(R_len_t n);
+static SEXP new_compact_rownames(R_len_t size);
 
 
 // [[ include("type-data-frame.h") ]]
@@ -40,16 +40,15 @@ bool is_bare_tibble(SEXP x) {
 }
 
 // [[ include("type-data-frame.h") ]]
-SEXP new_data_frame(SEXP x, R_len_t n) {
+SEXP new_data_frame(SEXP x, R_len_t size) {
   x = PROTECT(r_maybe_duplicate(x));
-  init_data_frame(x, n);
+  init_data_frame(x, size);
 
   UNPROTECT(1);
   return x;
 }
 
-static R_len_t df_size_from_list(SEXP x, SEXP n);
-static R_len_t df_size_from_n(SEXP n);
+static R_len_t df_size_from_list(SEXP x, SEXP size);
 static SEXP c_data_frame_class(SEXP cls);
 
 // [[ register() ]]
@@ -57,7 +56,7 @@ SEXP vctrs_new_data_frame(SEXP args) {
   args = CDR(args);
 
   SEXP x = CAR(args); args = CDR(args);
-  SEXP n = CAR(args); args = CDR(args);
+  SEXP size = CAR(args); args = CDR(args);
   SEXP cls = CAR(args); args = CDR(args);
   SEXP attrib = args;
 
@@ -65,12 +64,12 @@ SEXP vctrs_new_data_frame(SEXP args) {
   PROTECT_WITH_INDEX(attrib, &pi);
 
   if (TYPEOF(x) != VECSXP) {
-    Rf_errorcall(R_NilValue, "`x` must be a list");
+    Rf_errorcall(R_NilValue, "`.x` must be a list");
   }
 
   bool has_names = false;
   bool has_rownames = false;
-  R_len_t size = df_size_from_list(x, n);
+  R_len_t x_size = df_size_from_list(x, size);
 
   SEXP out = PROTECT(r_maybe_duplicate(x));
 
@@ -88,9 +87,9 @@ SEXP vctrs_new_data_frame(SEXP args) {
     }
 
     if (tag == R_RowNamesSymbol) {
-      // "row.names" is checked for consistency with n (if provided)
-      if (size != rownames_size(CAR(node)) && n != R_NilValue) {
-        Rf_errorcall(R_NilValue, "`n` and `row.names` must be consistent.");
+      // "row.names" is checked for consistency with `.size` (if provided)
+      if (x_size != rownames_size(CAR(node)) && size != R_NilValue) {
+        Rf_errorcall(R_NilValue, "`.size` and `row.names` must be consistent.");
       }
 
       has_rownames = true;
@@ -116,7 +115,7 @@ SEXP vctrs_new_data_frame(SEXP args) {
   }
 
   if (!has_rownames) {
-    SEXP rn = PROTECT(new_compact_rownames(size));
+    SEXP rn = PROTECT(new_compact_rownames(x_size));
     attrib = Rf_cons(rn, attrib);
     SET_TAG(attrib, R_RowNamesSymbol);
 
@@ -145,19 +144,21 @@ SEXP vctrs_new_data_frame(SEXP args) {
   return out;
 }
 
-static R_len_t df_size_from_list(SEXP x, SEXP n) {
-  if (n == R_NilValue) {
+static R_len_t df_size_from_size(SEXP size);
+
+static R_len_t df_size_from_list(SEXP x, SEXP size) {
+  if (size == R_NilValue) {
     return df_raw_size_from_list(x);
   }
-  return df_size_from_n(n);
+  return df_size_from_size(size);
 }
 
-static R_len_t df_size_from_n(SEXP n) {
-  if (TYPEOF(n) != INTSXP || Rf_length(n) != 1) {
-    Rf_errorcall(R_NilValue, "`n` must be an integer of size 1");
+static R_len_t df_size_from_size(SEXP size) {
+  if (TYPEOF(size) != INTSXP || Rf_length(size) != 1) {
+    Rf_errorcall(R_NilValue, "`.size` must be an integer of size 1");
   }
 
-  return r_int_get(n, 0);
+  return r_int_get(size, 0);
 }
 
 static SEXP c_data_frame_class(SEXP cls) {
@@ -217,43 +218,43 @@ R_len_t rownames_size(SEXP rn) {
   never_reached("rownames_size");
 }
 
-static void init_bare_data_frame(SEXP x, R_len_t n);
+static void init_bare_data_frame(SEXP x, R_len_t size);
 
 // [[ include("type-data-frame.h") ]]
-void init_data_frame(SEXP x, R_len_t n) {
+void init_data_frame(SEXP x, R_len_t size) {
   Rf_setAttrib(x, R_ClassSymbol, classes_data_frame);
-  init_bare_data_frame(x, n);
+  init_bare_data_frame(x, size);
 }
 // [[ include("type-data-frame.h") ]]
-void init_tibble(SEXP x, R_len_t n) {
+void init_tibble(SEXP x, R_len_t size) {
   Rf_setAttrib(x, R_ClassSymbol, classes_tibble);
-  init_bare_data_frame(x, n);
+  init_bare_data_frame(x, size);
 }
 
-static void init_bare_data_frame(SEXP x, R_len_t n) {
+static void init_bare_data_frame(SEXP x, R_len_t size) {
   if (Rf_length(x) == 0) {
     Rf_setAttrib(x, R_NamesSymbol, vctrs_shared_empty_chr);
   }
 
-  init_compact_rownames(x, n);
+  init_compact_rownames(x, size);
 }
 
 // [[ include("type-data-frame.h") ]]
-void init_compact_rownames(SEXP x, R_len_t n) {
-  SEXP rn = PROTECT(new_compact_rownames(n));
+void init_compact_rownames(SEXP x, R_len_t size) {
+  SEXP rn = PROTECT(new_compact_rownames(size));
   Rf_setAttrib(x, R_RowNamesSymbol, rn);
   UNPROTECT(1);
 }
 
-static SEXP new_compact_rownames(R_len_t n) {
-  if (n <= 0) {
+static SEXP new_compact_rownames(R_len_t size) {
+  if (size <= 0) {
     return vctrs_shared_empty_int;
   }
 
   SEXP out = Rf_allocVector(INTSXP, 2);
   int* out_data = INTEGER(out);
   out_data[0] = NA_INTEGER;
-  out_data[1] = -n;
+  out_data[1] = -size;
   return out;
 }
 

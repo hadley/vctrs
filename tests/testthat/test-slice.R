@@ -123,7 +123,7 @@ test_that("can subset data frame columns", {
 })
 
 test_that("can subset empty data frames", {
-  df <- new_data_frame(n = 3L)
+  df <- new_data_frame(.size = 3L)
   expect_equal(vec_size(vec_slice(df, integer())), 0)
   expect_equal(vec_size(vec_slice(df, 1L)), 1)
   expect_equal(vec_size(vec_slice(df, 1:3)), 3)

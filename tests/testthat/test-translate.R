@@ -160,8 +160,8 @@ test_that("can find a common encoding with data frames with character columns", 
 test_that("can find a common encoding with data frame subclasses with character columns", {
   encs <- encodings()
 
-  df_utf8 <- new_data_frame(list(x = encs$utf8), class = "subclass")
-  df_unknown <- new_data_frame(list(x = encs$unknown), class = "subclass")
+  df_utf8 <- new_data_frame(list(x = encs$utf8), .class = "subclass")
+  df_unknown <- new_data_frame(list(x = encs$unknown), .class = "subclass")
 
   results <- obj_maybe_translate_encoding2(df_utf8, df_unknown)
 
