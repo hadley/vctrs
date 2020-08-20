@@ -124,6 +124,7 @@ extern SEXP vctrs_cast_dispatch_native(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP vctrs_fast_c(SEXP, SEXP);
 extern SEXP vctrs_data_frame(SEXP, SEXP, SEXP);
 extern SEXP vctrs_df_list(SEXP, SEXP, SEXP);
+extern SEXP vctrs_map(SEXP, SEXP, SEXP);
 
 
 // Maturing
@@ -292,6 +293,7 @@ static const R_ExternalMethodDef ExtEntries[] = {
   {"vctrs_c",                          (DL_FUNC) &vctrs_c, 3},
   {"vctrs_new_data_frame",             (DL_FUNC) &vctrs_new_data_frame, -1},
   {"vctrs_chop2",                      (DL_FUNC) &vctrs_chop2, 1},
+  {"vctrs_map",                        (DL_FUNC) &vctrs_map, 3},
   {NULL, NULL, 0}
 };
 
@@ -325,6 +327,7 @@ void vctrs_init_bind(SEXP ns);
 void vctrs_init_cast(SEXP ns);
 void vctrs_init_data(SEXP ns);
 void vctrs_init_dictionary(SEXP ns);
+void vctrs_init_map(SEXP ns);
 void vctrs_init_names(SEXP ns);
 void vctrs_init_proxy_restore(SEXP ns);
 void vctrs_init_slice(SEXP ns);
@@ -346,6 +349,7 @@ SEXP vctrs_init_library(SEXP ns) {
   vctrs_init_cast(ns);
   vctrs_init_data(ns);
   vctrs_init_dictionary(ns);
+  vctrs_init_map(ns);
   vctrs_init_names(ns);
   vctrs_init_proxy_restore(ns);
   vctrs_init_slice(ns);

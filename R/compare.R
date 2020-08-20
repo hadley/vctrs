@@ -184,7 +184,7 @@ order_proxy <- function(proxy, direction = "asc", na_value = "largest") {
     if (vec_size(proxy) == 0L) {
       return(integer(0L))
     }
-    args <- map(unname(proxy), function(.x) {
+    args <- map(unstructure(proxy), function(.x) {
       if (is.data.frame(.x)) {
         .x <- order(vec_order(.x, direction = direction, na_value = na_value))
       }

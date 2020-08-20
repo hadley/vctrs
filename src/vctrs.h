@@ -637,7 +637,10 @@ void stop_corrupt_ordered_levels(SEXP x, struct vctrs_arg* arg) __attribute__((n
 # define COMPLEX_RO(x) ((const Rcomplex*) COMPLEX(x))
 # define STRING_PTR_RO(x) ((const SEXP*) STRING_PTR(x))
 # define RAW_RO(x) ((const Rbyte*) RAW(x))
+# define DATAPTR_RO(x) ((const void*) DATAPTR(x))
 #endif
+
+#define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
 
 
 #endif

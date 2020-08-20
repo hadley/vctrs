@@ -50,7 +50,7 @@ new_partial_factor <- function(partial = factor(), learned = factor()) {
 vec_ptype_full.vctrs_partial_factor <- function(x, ...) {
   empty <- ""
 
-  levels <- map(x, levels)
+  levels <- map(unclass(x), levels)
   hashes <- map_chr(levels, hash_label)
 
   needs_indent <- hashes != empty

@@ -103,6 +103,14 @@ void stop_unimplemented_type(const char* fn, SEXPTYPE type) {
   stop_internal(fn, "Unimplemented type `%s`.", Rf_type2char(type));
 }
 
+static inline
+SEXP r_eval_force(SEXP expr, SEXP env) {
+#if R_VERSION >= R_Version(3, 2, 3)
+  return R_forceAndCall(expr, 1, env);
+#else
+  return Rf_eval(expr, env);
+#endif
+}
 
 SEXP map(SEXP x, SEXP (*fn)(SEXP));
 SEXP map_with_data(SEXP x, SEXP (*fn)(SEXP, void*), void* data);
@@ -605,6 +613,7 @@ extern SEXP syms_vctrs_common_class_fallback;
 extern SEXP syms_fallback_class;
 extern SEXP syms_abort;
 extern SEXP syms_message;
+extern SEXP syms_dot_elt;
 
 static const char * const c_strs_vctrs_common_class_fallback = "vctrs:::common_class_fallback";
 
