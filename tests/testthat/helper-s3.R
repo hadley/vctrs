@@ -154,3 +154,25 @@ with_foobar_df_methods <- function(expr) {
   local_foobar_df_methods()
   expr
 }
+
+# Stores number of elements in an attribute
+new_count_list <- function(x = list()) {
+  stopifnot(vec_is_list(x))
+  structure(
+    x,
+    class = c("vctrs_count_list", "list"),
+    count = length(x)
+  )
+}
+local_count_list_methods <- function(frame = caller_env()) {
+  local_methods(
+    .frame = frame,
+    vec_restore.vctrs_count_list = function(x, ...) new_count_list(x),
+    vec_ptype2.vctrs_count_list.vctrs_count_list = function(x, y, ...) x,
+    vec_ptype2.list.vctrs_count_list = function(x, y, ...) y,
+    vec_ptype2.vctrs_count_list.list = function(x, y, ...) x,
+    vec_cast.vctrs_count_list.vctrs_count_list = function(x, to, ...) x,
+    vec_cast.list.vctrs_count_list = function(x, to, ...) unstructure(x),
+    vec_cast.vctrs_count_list.list = function(x, to, ...) new_count_list(x)
+  )
+}
