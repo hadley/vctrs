@@ -161,22 +161,21 @@ test_that("max<list_of<a>, list_of<b>> is list_of<max<a, b>>", {
 
 test_that("safe casts work as expected", {
   x <- list_of(1)
-  expect_equal(vec_cast(NULL, x), NULL)
-  expect_equal(vec_cast(NA, x), list_of(NULL, .ptype = double()))
+  expect_identical(vec_cast(NULL, x), NULL)
+  expect_identical(vec_cast(NA, x), list_of(NULL, .ptype = double()))
+  expect_identical(vec_cast(list(1), x), list_of(1))
+  expect_identical(vec_cast(list(TRUE), x), list_of(1))
+  expect_identical(vec_cast(x, list()), list(1))
 
   # These used to be allowed
   expect_error(vec_cast(1L, x), class = "vctrs_error_incompatible_type")
   expect_error(vec_cast(1, x), class = "vctrs_error_incompatible_type")
-  expect_error(vec_cast(list(1), x), class = "vctrs_error_incompatible_type")
-  expect_error(vec_cast(list(TRUE), x), class = "vctrs_error_incompatible_type")
-  expect_error(vec_cast(x, list()), class = "vctrs_error_incompatible_type")
 })
 
 test_that("lossy casts generate warning (no longer the case)", {
-  # This used to be a lossy cast warning
   expect_error(
     vec_cast(list(c(1.5, 1), 1L), to = list_of(1L)),
-    class = "vctrs_error_incompatible_type"
+    class = "vctrs_error_cast_lossy"
   )
 })
 
@@ -201,4 +200,48 @@ test_that("vec_ptype2(<list_of<>>, NA) is symmetric (#687)", {
   lof <- list_of(1, 2, 3)
   expect_identical(vec_ptype2(lof, NA), vec_ptype(lof))
   expect_identical(vec_ptype2(NA, lof), vec_ptype(lof))
+})
+
+test_that("list_of() coerces to list() and list_of()", {
+  expect_identical(
+    vec_ptype_common(list_of(1), list()),
+    list_of(.ptype = double())
+  )
+  expect_identical(
+    vec_cast_common(list_of(1), list()),
+    list(list_of(1), list_of(.ptype = double()))
+  )
+
+  # There is always a common type between list-of and list
+  expect_identical(
+    vec_ptype_common(list_of(1), list("")),
+    list_of(.ptype = double())
+  )
+  # The incompatibility is raised upon casting
+  expect_error(
+    vec_cast_common(list_of(1), list("")),
+    class = "vctrs_error_incompatible_type"
+  )
+
+  # One list() in the middle of common type reduction doesn't change
+  # the result
+  expect_error(
+    vec_ptype_common(list_of(1), list_of("")),
+    class = "vctrs_error_incompatible_type"
+  )
+  expect_error(
+    vec_ptype_common(list_of(1), list(), list_of("")),
+    class = "vctrs_error_incompatible_type"
+  )
+})
+
+test_that("can concatenate list and list-of (#1161)", {
+  expect_identical(
+    vec_c(list(1), list_of(2)),
+    list_of(1, 2)
+  )
+  expect_error(
+    vec_c(list(""), list_of(2)),
+    class = "vctrs_error_incompatible_type"
+  )
 })

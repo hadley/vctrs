@@ -51,6 +51,10 @@ by coercing all input items.
 \details{
 Unlike regular lists, setting a list element to \code{NULL} using \code{[[}
 does not remove it.
+
+Combining a \code{list_of} and a \code{list} results in a \code{list_of} if the
+elements of the bare list are compatible. A
+\code{vctrs_error_incompatible_type} error is thrown otherwise.
 }
 \examples{
 x <- list_of(1:3, 5:6, 10:15)

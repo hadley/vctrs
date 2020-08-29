@@ -6,6 +6,10 @@
 
 # vctrs 0.3.3
 
+* `list_of` and `list` can now be combined. Bare lists are promoted to
+  `list_of` if their elements are compatible. An error is thrown
+  otherwise (#1161).
+
 * The `table` class is now implemented as a wrapper type that
   delegates its coercion methods. It used to be restricted to integer
   tables (#1190).

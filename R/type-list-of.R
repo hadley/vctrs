@@ -7,6 +7,10 @@
 #' Unlike regular lists, setting a list element to `NULL` using `[[`
 #' does not remove it.
 #'
+#' Combining a `list_of` and a `list` results in a `list_of` if the
+#' elements of the bare list are compatible. A
+#' `vctrs_error_incompatible_type` error is thrown otherwise.
+#'
 #' @inheritParams vec_c
 #' @param x For `as_list_of()`, a vector to be coerced to list_of.
 #' @param y,to Arguments to `vec_ptype2()` and `vec_cast()`.
@@ -179,6 +183,8 @@ as.character.vctrs_list_of <- function(x, ...) {
 
 # Type system -------------------------------------------------------------
 
+# These are no longer necessary but exported for backward compatibility
+
 #' @rdname list_of
 #' @inheritParams vec_ptype2
 #' @export vec_ptype2.vctrs_list_of
@@ -187,13 +193,6 @@ as.character.vctrs_list_of <- function(x, ...) {
 vec_ptype2.vctrs_list_of <- function(x, y, ..., x_arg = "", y_arg = "") {
   UseMethod("vec_ptype2.vctrs_list_of")
 }
-#' @method vec_ptype2.vctrs_list_of vctrs_list_of
-#' @export
-vec_ptype2.vctrs_list_of.vctrs_list_of <- function(x, y, ...) {
-  type <- vec_ptype2(attr(x, "ptype"), attr(y, "ptype"))
-  new_list_of(list(), type)
-}
-
 #' @rdname list_of
 #' @export vec_cast.vctrs_list_of
 #' @method vec_cast vctrs_list_of
@@ -203,10 +202,32 @@ vec_cast.vctrs_list_of <- function(x, to, ...) {
 }
 
 #' @export
-#' @method vec_cast.vctrs_list_of vctrs_list_of
+vec_ptype2.vctrs_list_of.vctrs_list_of <- function(x, y, ...) {
+  list_of_ptype2(x, y, ...)
+}
+#' @export
+vec_ptype2.list.vctrs_list_of <- function(x, y, ...) {
+  list_of_ptype2(new_list_of(x), y, ...)
+}
+#' @export
+vec_ptype2.vctrs_list_of.list <- function(x, y, ...) {
+  list_of_ptype2(x, new_list_of(y), ...)
+}
+
+list_of_ptype2 <- function(x, y, ...) {
+  type <- vec_ptype2(attr(x, "ptype"), attr(y, "ptype"), ...)
+  new_list_of(list(), type)
+}
+
+#' @export
 vec_cast.vctrs_list_of.vctrs_list_of <-function(x, to, ...) {
-  # Casting list to list_of will warn/err if the cast is lossy,
-  # but the locations refer to the inner vectors,
-  # and the cast fails if all (vector) elements in a single (list) element
-  as_list_of(x, .ptype = attr(to, "ptype"))
+  x
+}
+#' @export
+vec_cast.list.vctrs_list_of <-function(x, to, ...) {
+  unstructure(x)
+}
+#' @export
+vec_cast.vctrs_list_of.list <-function(x, to, ...) {
+  list_of(!!!x, .ptype = attr(to, "ptype"))
 }
