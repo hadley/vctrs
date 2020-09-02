@@ -1,3 +1,7 @@
+# vctrs 0.2.2.9000
+
+* New `vec_all_duplicate()` for detecting if all values in a vector are
+  duplicated elsewhere.
 
 # vctrs (development version)
 

@@ -3,11 +3,14 @@
 \name{vec_duplicate}
 \alias{vec_duplicate}
 \alias{vec_duplicate_any}
+\alias{vec_all_duplicate}
 \alias{vec_duplicate_detect}
 \alias{vec_duplicate_id}
 \title{Find duplicated values}
 \usage{
 vec_duplicate_any(x)
+
+vec_all_duplicate(x)
 
 vec_duplicate_detect(x)
 
@@ -19,6 +22,7 @@ vec_duplicate_id(x)
 \value{
 \itemize{
 \item \code{vec_duplicate_any()}: a logical vector of length 1.
+\item \code{vec_all_duplicate()}: a logical vector of length 1.
 \item \code{vec_duplicate_detect()}: a logical vector the same length as \code{x}.
 \item \code{vec_duplicate_id()}: an integer vector the same length as \code{x}.
 }
@@ -27,6 +31,7 @@ vec_duplicate_id(x)
 \itemize{
 \item \code{vec_duplicate_any()}: detects the presence of duplicated values,
 similar to \code{\link[=anyDuplicated]{anyDuplicated()}}.
+\item \code{vec_all_duplicate()}: detects if all values are duplicated elsewhere.
 \item \code{vec_duplicate_detect()}: returns a logical vector describing if each
 element of the vector is duplicated elsewhere. Unlike \code{\link[=duplicated]{duplicated()}}, it
 reports all duplicated values, not just the second and subsequent
@@ -53,6 +58,10 @@ all \code{NaN} are also considered to be equal.)
 \examples{
 vec_duplicate_any(1:10)
 vec_duplicate_any(c(1, 1:10))
+
+vec_all_duplicate(c(1, 1, 2, 2))
+vec_all_duplicate(c(1, 1, 2, 3))
+vec_all_duplicate(c(NA, NA))
 
 x <- c(10, 10, 20, 30, 30, 40)
 vec_duplicate_detect(x)

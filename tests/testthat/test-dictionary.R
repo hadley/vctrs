@@ -55,6 +55,19 @@ test_that("vec_duplicate_any returns single TRUE/FALSE", {
   expect_true(vec_duplicate_any(c(1:10, 1)))
 })
 
+test_that("vec_duplicate_any returns FALSE for size 0 input", {
+  expect_false(vec_duplicate_any(integer()))
+})
+
+test_that("vec_all_duplicate returns single TRUE/FALSE", {
+  expect_true(vec_all_duplicate(c(1, 1, 2, 2)))
+  expect_false(vec_all_duplicate(c(1, 1, 2, 3)))
+})
+
+test_that("vec_all_duplicate returns TRUE for size 0 input", {
+  expect_true(vec_all_duplicate(integer()))
+})
+
 test_that("vec_duplicate_id gives position of first found", {
   x <- c(1, 2, 3, 1, 4)
   expect_equal(vec_duplicate_id(x), c(1, 2, 3, 1, 5))
@@ -139,6 +152,7 @@ test_that("duplicate functions take the equality proxy recursively", {
   df <- data_frame(x = x)
 
   expect_equal(vec_duplicate_any(df), TRUE)
+  expect_equal(vec_all_duplicate(df), FALSE)
   expect_equal(vec_duplicate_detect(df), c(TRUE, TRUE, FALSE))
   expect_equal(vec_duplicate_id(df), c(1, 1, 3))
 })
@@ -171,6 +185,7 @@ test_that("duplicate functions works with different encodings", {
   expect_equal(vec_duplicate_id(encs), rep(1, 3))
   expect_equal(vec_duplicate_detect(encs), rep(TRUE, 3))
   expect_equal(vec_duplicate_any(encs), TRUE)
+  expect_equal(vec_all_duplicate(encs), TRUE)
 })
 
 test_that("vec_unique() returns differently encoded strings in the order they appear", {

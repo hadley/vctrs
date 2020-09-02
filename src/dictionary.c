@@ -437,6 +437,48 @@ bool duplicated_any(SEXP x) {
   return out;
 }
 
+// [[ export() ]]
+SEXP vctrs_all_duplicate(SEXP x) {
+  int nprot = 0;
+
+  R_len_t n = vec_size(x);
+
+  x = PROTECT_N(vec_proxy_equal(x), &nprot);
+  x = PROTECT_N(obj_maybe_translate_encoding(x, n), &nprot);
+
+  dictionary d;
+  dict_init(&d, x);
+  PROTECT_DICT(&d, &nprot);
+
+  // Initialize to 0. Some hash locations may never be touched but we
+  // iterate over them later so they need a value.
+  SEXP counts = PROTECT_N(Rf_allocVector(INTSXP, d.size), &nprot);
+  int* p_counts = INTEGER(counts);
+  memset(p_counts, 0, d.size * sizeof(int));
+
+  for (int i = 0; i < n; ++i) {
+    int32_t hash = dict_hash_scalar(&d, i);
+
+    if (d.key[hash] == DICT_EMPTY) {
+      dict_put(&d, hash, i);
+    }
+
+    ++p_counts[hash];
+  }
+
+  int out = 1;
+
+  for (int i = 0; i < d.size; ++i) {
+    if (p_counts[i] == 1) {
+      out = 0;
+      break;
+    }
+  }
+
+  UNPROTECT(nprot);
+  return Rf_ScalarLogical(out);
+}
+
 SEXP vctrs_n_distinct(SEXP x) {
   int nprot = 0;
 
