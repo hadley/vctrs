@@ -1,5 +1,6 @@
 #include <math.h>
 #include "equal.h"
+#include "equal-generic.h"
 #include "vctrs.h"
 #include "utils.h"
 
@@ -115,8 +116,21 @@ SEXP vctrs_equal(SEXP x, SEXP y, SEXP na_equal_) {
   bool na_equal = r_bool_as_int(na_equal_);
 
   switch (type) {
-  case vctrs_type_logical:   EQUAL(int, LOGICAL_RO, lgl_equal_scalar);
-  case vctrs_type_integer:   EQUAL(int, INTEGER_RO, int_equal_scalar);
+  case vctrs_type_logical:
+  case vctrs_type_integer: {
+    SEXP out = PROTECT(Rf_allocVector(LGLSXP, size));
+    int* p_out = LOGICAL(out);
+
+    equal_fill(TYPEOF(x),
+               r_vec_deref_const(x),
+               r_vec_deref_const(y),
+               size,
+               na_equal,
+               p_out);
+
+    UNPROTECT(3);
+    return out;
+  }
   case vctrs_type_double:    EQUAL(double, REAL_RO, dbl_equal_scalar);
   case vctrs_type_raw:       EQUAL(Rbyte, RAW_RO, raw_equal_scalar);
   case vctrs_type_complex:   EQUAL(Rcomplex, COMPLEX_RO, cpl_equal_scalar);

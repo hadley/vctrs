@@ -1749,6 +1749,11 @@ void stop_internal(const char* fn, const char* fmt, ...) {
 #undef FMT_INTERP
 #undef FMT_BUFSIZE
 
+__attribute__((noreturn))
+void stop_unimplemented_type(const char* fn, SEXPTYPE type) {
+  stop_internal(fn, "Unimplemented type `%s`.", Rf_type2char(type));
+}
+
 
 bool vctrs_debug_verbose = false;
 

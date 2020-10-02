@@ -96,12 +96,7 @@ SEXP vctrs_dispatch6(SEXP fn_sym, SEXP fn,
 __attribute__((noreturn)) void r_abort(const char* fmt, ...);
 __attribute__((noreturn)) void stop_internal(const char* fn, const char* fmt, ...);
 __attribute__((noreturn)) void stop_unimplemented_vctrs_type(const char* fn, enum vctrs_type);
-
-static inline
-__attribute__((noreturn))
-void stop_unimplemented_type(const char* fn, SEXPTYPE type) {
-  stop_internal(fn, "Unimplemented type `%s`.", Rf_type2char(type));
-}
+__attribute__((noreturn)) void stop_unimplemented_type(const char* fn, SEXPTYPE type);
 
 
 SEXP map(SEXP x, SEXP (*fn)(SEXP));

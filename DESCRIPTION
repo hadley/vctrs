@@ -51,6 +51,8 @@ Suggests:
     zeallot
 VignetteBuilder: 
     knitr
+SystemRequirements:
+    C++11
 Encoding: UTF-8
 Language: en-GB
 LazyData: true
