@@ -162,6 +162,66 @@ bool p_compare_na_equal(const void* p_x,
 
 // -----------------------------------------------------------------------------
 
+#define P_COMPARE_GE_NA_EQUAL(CTYPE, P_COMPARE_NA_EQUAL) do {                       \
+  return P_COMPARE_NA_EQUAL(((CTYPE const*) p_x)[i], ((CTYPE const*) p_y)[j]) >= 0; \
+} while (0)
+
+static inline
+int p_nil_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(r_obj*, nil_compare_na_equal);
+}
+static inline
+int p_lgl_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(int, lgl_compare_na_equal);
+}
+static inline
+int p_int_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(int, int_compare_na_equal);
+}
+static inline
+int p_dbl_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(double, dbl_compare_na_equal);
+}
+static inline
+int p_cpl_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(Rcomplex, cpl_compare_na_equal);
+}
+static inline
+int p_chr_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(r_obj*, chr_compare_na_equal);
+}
+static inline
+int p_raw_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(Rbyte, raw_compare_na_equal);
+}
+static inline
+int p_list_compare_ge_na_equal(const void* p_x, r_ssize i, const void* p_y, r_ssize j) {
+  P_COMPARE_GE_NA_EQUAL(r_obj*, list_compare_na_equal);
+}
+
+#undef P_COMPARE_GE_NA_EQUAL
+
+static inline
+int p_compare_ge_na_equal(const void* p_x,
+                          r_ssize i,
+                          const void* p_y,
+                          r_ssize j,
+                          const enum vctrs_type type) {
+  switch (type) {
+  case vctrs_type_null: return p_nil_compare_ge_na_equal(p_x, i, p_y, j);
+  case vctrs_type_logical: return p_lgl_compare_ge_na_equal(p_x, i, p_y, j);
+  case vctrs_type_integer: return p_int_compare_ge_na_equal(p_x, i, p_y, j);
+  case vctrs_type_double: return p_dbl_compare_ge_na_equal(p_x, i, p_y, j);
+  case vctrs_type_complex: return p_cpl_compare_ge_na_equal(p_x, i, p_y, j);
+  case vctrs_type_character: return p_chr_compare_ge_na_equal(p_x, i, p_y, j);
+  case vctrs_type_raw: return p_raw_compare_ge_na_equal(p_x, i, p_y, j);
+  case vctrs_type_list: return p_list_compare_ge_na_equal(p_x, i, p_y, j);
+  default: stop_unimplemented_vctrs_type("p_compare_ge_na_equal", type);
+  }
+}
+
+// -----------------------------------------------------------------------------
+
 static inline
 int nil_compare_na_propagate(r_obj* x, r_obj* y) {
   r_stop_internal("nil_compare_na_propagate", "Can't compare NULL values.");
