@@ -13,10 +13,7 @@ r_obj* nested_containment_order(r_obj* proxy,
                                 r_obj* order,
                                 r_obj* group_sizes) {
   if (!is_data_frame(proxy)) {
-    r_stop_internal(
-      "compute_nested_containment_order",
-      "`proxy` must be a data frame."
-    );
+    r_stop_internal("nested_containment_order", "`proxy` must be a data frame.");
   }
 
   int n_prot = 0;
