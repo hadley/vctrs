@@ -4,7 +4,9 @@
 #include "poly-op.h"
 #include "compare.h"
 
-static inline int p_df_nested_containment_compare_ge_na_equal(const void* x, r_ssize i, const void* y, r_ssize j);
+#include "decl/matches-decl.h"
+
+// -----------------------------------------------------------------------------
 
 // Currently assumes `proxy` is in completely increasing order
 r_obj* nested_containment_order(r_obj* proxy,
