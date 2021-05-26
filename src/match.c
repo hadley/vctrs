@@ -81,8 +81,7 @@ r_obj* nested_containment_order(r_obj* proxy,
       growable_set_int(&prev_rows, prev_row_id, cur_row);
     }
 
-    // `+ 1` just to be 1-indexed
-    int elt_out = (new_id ? max_prev_row_id : prev_row_id) + 1;
+    int elt_out = new_id ? max_prev_row_id : prev_row_id;
     int group_size = v_group_sizes[i_group];
 
     for (int i = 0; i < group_size; ++i) {
