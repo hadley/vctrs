@@ -187,12 +187,6 @@
 
 static inline bool parse_nan_distinct(SEXP nan_distinct);
 
-static SEXP vec_order(SEXP x,
-                      SEXP direction,
-                      SEXP na_value,
-                      bool nan_distinct,
-                      SEXP chr_transform);
-
 // [[ register() ]]
 SEXP vctrs_order(SEXP x,
                  SEXP direction,
@@ -211,8 +205,12 @@ static SEXP vec_order_info_impl(SEXP x,
                                 bool chr_ordered,
                                 bool group_sizes);
 
-static
-SEXP vec_order(SEXP x, SEXP direction, SEXP na_value, bool nan_distinct, SEXP chr_transform) {
+// [[ include("order-radix.h") ]]
+SEXP vec_order(SEXP x,
+               SEXP direction,
+               SEXP na_value,
+               bool nan_distinct,
+               SEXP chr_transform) {
   const bool chr_ordered = true;
   const bool group_sizes = false;
   SEXP info = vec_order_info_impl(x, direction, na_value, nan_distinct, chr_transform, chr_ordered, group_sizes);
