@@ -250,6 +250,8 @@ r_obj* df_matches(r_obj* needles,
   struct r_dyn_array* p_o_haystack_starts = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
   KEEP_N(p_o_haystack_starts->shelter, &n_prot);
 
+  // TODO: `match_sizes` and `needles_locs` aren't needed if `multiple %in% c("last", "first")`
+  // Size is always 1, and location is increasing sequence of locations.
   struct r_dyn_array* p_match_sizes = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
   KEEP_N(p_match_sizes->shelter, &n_prot);
 
