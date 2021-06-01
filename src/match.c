@@ -847,6 +847,23 @@ enum vctrs_multiple parse_multiple(r_obj* multiple) {
 // -----------------------------------------------------------------------------
 
 static
+const char* v_matches_df_names_c_strings[] = {
+  "needles",
+  "haystack"
+};
+static
+const enum r_type v_matches_df_types[] = {
+  R_TYPE_integer,
+  R_TYPE_integer
+};
+enum matches_df_locs {
+  MATCHES_DF_LOCS_needles,
+  MATCHES_DF_LOCS_haystack
+};
+#define MATCHES_DF_SIZE R_ARR_SIZEOF(v_matches_df_types)
+
+
+static
 r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
@@ -864,15 +881,18 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     out_size += (r_ssize) v_match_sizes[i];
   }
 
-  r_obj* out = KEEP(r_alloc_list(2));
+  r_obj* names = KEEP(r_chr_n(v_matches_df_names_c_strings, MATCHES_DF_SIZE));
 
-  r_obj* out_needles = r_alloc_integer(out_size);
-  int* v_out_needles = r_int_begin(out_needles);
-  r_list_poke(out, 0, out_needles);
+  r_obj* out = KEEP(r_alloc_df_list(
+    out_size,
+    names,
+    v_matches_df_types,
+    MATCHES_DF_SIZE
+  ));
+  r_init_data_frame(out, out_size);
 
-  r_obj* out_haystack = r_alloc_integer(out_size);
-  int* v_out_haystack = r_int_begin(out_haystack);
-  r_list_poke(out, 1, out_haystack);
+  int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
+  int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
 
   // `vec_order()` setup
   r_obj* const direction = KEEP(r_chr("asc"));
@@ -919,7 +939,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     }
   }
 
-  FREE(5);
+  FREE(6);
   return out;
 }
 
