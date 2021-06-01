@@ -255,6 +255,8 @@ r_obj* df_matches(r_obj* needles,
   struct r_dyn_array* p_match_sizes = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
   KEEP_N(p_match_sizes->shelter, &n_prot);
 
+  // TODO: Also don't need `needles_locs` when `n_nested_groups == 1` (even if multiple="all"),
+  // as this implies that there is no nested and the locations are again an ordered sequence.
   struct r_dyn_array* p_needles_locs = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
   KEEP_N(p_needles_locs->shelter, &n_prot);
 
