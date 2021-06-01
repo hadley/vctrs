@@ -172,7 +172,7 @@ r_obj* df_matches(r_obj* needles,
 
   // `vec_order()` setup
   r_obj* const direction = KEEP_N(r_chr("asc"), &n_prot);
-  r_obj* const na_value = KEEP_N(r_chr("largest"), &n_prot);
+  r_obj* const na_value = KEEP_N(r_chr("smallest"), &n_prot);
   const bool nan_distinct = true;
   r_obj* const chr_transform = r_null;
   const bool chr_ordered = true;
@@ -347,15 +347,13 @@ r_obj* df_matches(r_obj* needles,
     }
   }
 
-  r_ssize n_used = size_needles + n_extra;
-
   r_obj* out = KEEP_N(expand_compact_indices(
     v_o_haystack,
     p_o_haystack_starts,
     p_match_sizes,
     p_needles_locs,
-    n_used,
-    no_match
+    no_match,
+    any_multiple
   ), &n_prot);
 
   FREE(n_prot);
@@ -870,8 +868,10 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
-                              r_ssize n_used,
-                              int no_match) {
+                              int no_match,
+                              bool any_multiple) {
+  const r_ssize n_used = p_o_haystack_starts->count;
+
   const int* v_o_haystack_starts = (const int*) r_arr_cbegin(p_o_haystack_starts);
   const int* v_match_sizes = (const int*) r_arr_cbegin(p_match_sizes);
   const int* v_needles_locs = (const int*) r_arr_cbegin(p_needles_locs);
@@ -898,7 +898,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 
   // `vec_order()` setup
   r_obj* const direction = KEEP(r_chr("asc"));
-  r_obj* const na_value = KEEP(r_chr("largest"));
+  r_obj* const na_value = KEEP(r_chr("smallest"));
   const bool nan_distinct = true;
   r_obj* const chr_transform = r_null;
 
@@ -939,6 +939,25 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
       ++out_loc;
       ++o_haystack_loc;
     }
+  }
+
+  // If we had multiple matches, we also have to re-order the haystack column
+  // by first appearance within each needle group.
+  // Currently, the needles columns is correct, but within each needles group
+  // the haystack column is ordered naturally rather than by first appearance.
+  if (any_multiple) {
+    r_obj* o_haystack_appearance = KEEP(vec_order(out, direction, na_value, nan_distinct, chr_transform));
+    const int* v_o_haystack_appearance = r_int_cbegin(o_haystack_appearance);
+
+    r_obj* out_haystack2 = KEEP(r_alloc_integer(out_size));
+    int* v_out_haystack2 = r_int_begin(out_haystack2);
+
+    for (r_ssize i = 0; i < out_size; ++i) {
+      v_out_haystack2[i] = v_out_haystack[v_o_haystack_appearance[i] - 1];
+    }
+
+    r_list_poke(out, 1, out_haystack2);
+    FREE(2);
   }
 
   FREE(6);

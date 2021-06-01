@@ -82,8 +82,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
-                              r_ssize n_used,
-                              int no_match);
+                              int no_match,
+                              bool any_multiple);
 
 r_obj* nested_containment_order(r_obj* proxy,
                                 r_obj* order,
