@@ -893,20 +893,29 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     const int match_size = v_match_sizes[loc];
     const int needles_loc = v_needles_locs[loc];
 
-    for (r_ssize j = 0; j < match_size; ++j) {
-      int haystack_loc;
-
-      if (int_is_missing(o_haystack_loc)) {
-        haystack_loc = no_match;
-      } else {
-        haystack_loc = v_o_haystack[o_haystack_loc - 1];
-        ++o_haystack_loc;
+    if (int_is_missing(o_haystack_loc)) {
+      if (match_size != 1) {
+        r_stop_internal(
+          "expand_compact_indices",
+          "`match_size` should always be 1 in the case of no matches."
+        );
       }
+
+      v_out_needles[out_loc] = needles_loc;
+      v_out_haystack[out_loc] = no_match;
+      ++out_loc;
+
+      continue;
+    }
+
+    for (r_ssize j = 0; j < match_size; ++j) {
+      const int haystack_loc = v_o_haystack[o_haystack_loc - 1];
 
       v_out_needles[out_loc] = needles_loc;
       v_out_haystack[out_loc] = haystack_loc;
 
       ++out_loc;
+      ++o_haystack_loc;
     }
   }
 
