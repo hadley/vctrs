@@ -28,9 +28,6 @@ void df_matches_recurse(r_ssize col,
                         const struct poly_df_data* p_haystack,
                         const int* v_o_needles,
                         const int* v_o_haystack,
-                        bool use_nested_groups,
-                        const int* v_nested_groups,
-                        int nested_group,
                         bool na_equal,
                         enum vctrs_multiple multiple,
                         enum vctrs_ops* v_ops,
@@ -39,6 +36,40 @@ void df_matches_recurse(r_ssize col,
                         struct r_dyn_array* p_needles_locs,
                         r_ssize* p_n_extra,
                         bool* p_any_multiple);
+
+static
+void df_matches_with_nested_groups(r_ssize size_haystack,
+                                   int n_nested_groups,
+                                   const int* v_nested_groups,
+                                   r_ssize col,
+                                   r_ssize lower_o_needles,
+                                   r_ssize upper_o_needles,
+                                   const struct poly_df_data* p_needles,
+                                   const struct poly_df_data* p_haystack,
+                                   const int* v_o_needles,
+                                   const int* v_o_haystack,
+                                   bool na_equal,
+                                   enum vctrs_multiple multiple,
+                                   enum vctrs_ops* v_ops,
+                                   struct r_dyn_array* p_o_haystack_starts,
+                                   struct r_dyn_array* p_match_sizes,
+                                   struct r_dyn_array* p_needles_locs,
+                                   r_ssize* p_n_extra,
+                                   bool* p_any_multiple);
+
+static inline
+r_ssize int_lower_duplicate(int needle,
+                            const int* v_haystack,
+                            const int* v_o_haystack,
+                            r_ssize lower_o_haystack,
+                            r_ssize upper_o_haystack);
+
+static inline
+r_ssize int_upper_duplicate(int needle,
+                            const int* v_haystack,
+                            const int* v_o_haystack,
+                            r_ssize lower_o_haystack,
+                            r_ssize upper_o_haystack);
 
 static inline
 void parse_condition(r_obj* condition, r_ssize size, enum vctrs_ops* v_ops);
