@@ -13,7 +13,8 @@ enum vctrs_multiple {
   VCTRS_MULTIPLE_all = 0,
   VCTRS_MULTIPLE_warning = 1, // Warning + all
   VCTRS_MULTIPLE_first = 2,
-  VCTRS_MULTIPLE_error = 3
+  VCTRS_MULTIPLE_last = 3,
+  VCTRS_MULTIPLE_error = 4
 };
 
 enum vctrs_ops {
@@ -502,20 +503,38 @@ void df_matches_recurse(r_ssize col,
         const int o_haystack_start = R_ARR_GET(int, p_o_haystack_starts, loc);
         const bool first_touch = o_haystack_start == r_globals.na_int;
 
-        const int elt_o_haystack_starts = grp_lower_o_haystack + 1;
-
         switch (multiple) {
         case VCTRS_MULTIPLE_first: {
+          const int elt_o_haystack_starts = grp_lower_o_haystack + 1;
+
           if (first_touch) {
             R_ARR_POKE(int, p_o_haystack_starts, loc, elt_o_haystack_starts);
             continue;
           }
 
-          const int haystack_start = v_o_haystack[o_haystack_start - 1];
-          const int grp_haystack_start = v_o_haystack[grp_lower_o_haystack];
+          const int o_haystack = v_o_haystack[o_haystack_start - 1];
+          const int o_haystack_lower = v_o_haystack[grp_lower_o_haystack];
 
-          if (grp_haystack_start < haystack_start) {
+          if (o_haystack_lower < o_haystack) {
             // New start is before current one
+            R_ARR_POKE(int, p_o_haystack_starts, loc, elt_o_haystack_starts);
+          }
+
+          break;
+        }
+        case VCTRS_MULTIPLE_last: {
+          const int elt_o_haystack_starts = grp_upper_o_haystack + 1;
+
+          if (first_touch) {
+            R_ARR_POKE(int, p_o_haystack_starts, loc, elt_o_haystack_starts);
+            continue;
+          }
+
+          const int o_haystack = v_o_haystack[o_haystack_start - 1];
+          const int o_haystack_upper = v_o_haystack[grp_upper_o_haystack];
+
+          if (o_haystack_upper > o_haystack) {
+            // New start is after current one
             R_ARR_POKE(int, p_o_haystack_starts, loc, elt_o_haystack_starts);
           }
 
@@ -524,6 +543,7 @@ void df_matches_recurse(r_ssize col,
         case VCTRS_MULTIPLE_all:
         case VCTRS_MULTIPLE_error:
         case VCTRS_MULTIPLE_warning: {
+          const int elt_o_haystack_starts = grp_lower_o_haystack + 1;
           const int elt_match_sizes = grp_upper_o_haystack - grp_lower_o_haystack + 1;
           const int elt_needles_locs = loc + 1;
 
@@ -816,9 +836,10 @@ enum vctrs_multiple parse_multiple(r_obj* multiple) {
   if (!strcmp(c_multiple, "all")) return VCTRS_MULTIPLE_all;
   if (!strcmp(c_multiple, "warning")) return VCTRS_MULTIPLE_warning;
   if (!strcmp(c_multiple, "first")) return VCTRS_MULTIPLE_first;
+  if (!strcmp(c_multiple, "last")) return VCTRS_MULTIPLE_last;
   if (!strcmp(c_multiple, "error")) return VCTRS_MULTIPLE_error;
 
-  r_abort("`multiple` must be one of \"all\", \"first\", \"warning\", or \"error\".");
+  r_abort("`multiple` must be one of \"all\", \"first\", \"last\", \"warning\", or \"error\".");
 }
 
 // -----------------------------------------------------------------------------
