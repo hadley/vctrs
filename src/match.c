@@ -398,6 +398,7 @@ void df_matches_recurse(r_ssize col,
   const r_ssize mid_o_needles = midpoint(lower_o_needles, upper_o_needles);
   const r_ssize mid_needles = v_o_needles[mid_o_needles] - 1;
   const int val_needle = v_needles_col[mid_needles];
+  const bool is_na_needle = int_is_missing(val_needle);
 
   while (grp_lower_o_haystack <= grp_upper_o_haystack) {
     const r_ssize grp_mid_o_haystack = midpoint(grp_lower_o_haystack, grp_upper_o_haystack);
@@ -431,26 +432,36 @@ void df_matches_recurse(r_ssize col,
     }
   }
 
-  // Adjust bounds based on condition
-  // TODO: Handle NA
+  // Adjust bounds based on non-equi condition.
+  // If needle is NA, never extend the bounds to capture values past it.
   // TODO: Handle !=
   switch (op) {
   case VCTRS_OPS_lt: {
+    // Exclude found needle
     grp_lower_o_haystack = grp_upper_o_haystack + 1;
-    grp_upper_o_haystack = upper_o_haystack;
+    if (!is_na_needle) {
+      grp_upper_o_haystack = upper_o_haystack;
+    }
     break;
   }
   case VCTRS_OPS_lte: {
-    grp_upper_o_haystack = upper_o_haystack;
+    if (!is_na_needle) {
+      grp_upper_o_haystack = upper_o_haystack;
+    }
     break;
   }
   case VCTRS_OPS_gt: {
+    // Exclude found needle
     grp_upper_o_haystack = grp_lower_o_haystack - 1;
-    grp_lower_o_haystack = lower_o_haystack;
+    if (!is_na_needle) {
+      grp_lower_o_haystack = lower_o_haystack;
+    }
     break;
   }
   case VCTRS_OPS_gte: {
-    grp_lower_o_haystack = lower_o_haystack;
+    if (!is_na_needle) {
+      grp_lower_o_haystack = lower_o_haystack;
+    }
     break;
   }
   case VCTRS_OPS_eq: break;
