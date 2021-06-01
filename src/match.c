@@ -193,8 +193,9 @@ r_obj* df_matches(r_obj* needles,
   r_obj* o_haystack = vctrs_shared_empty_int;
   r_obj* nested_groups = vctrs_shared_empty_int;
   int n_nested_groups = 1;
+  bool possibly_nested = any_directional && n_cols > 1;
 
-  if (any_directional) {
+  if (possibly_nested) {
     r_obj* info = KEEP_N(vec_order_info(haystack, direction, na_value, nan_distinct, chr_transform, chr_ordered), &n_prot);
     o_haystack = r_list_get(info, 0);
     r_obj* group_sizes_haystack = r_list_get(info, 1);
@@ -202,10 +203,10 @@ r_obj* df_matches(r_obj* needles,
     n_nested_groups = r_as_int(r_list_get(nested_info, 1));
 
     if (n_nested_groups != 1) {
-      // If only a single nested group exists, it was a single column data frame
-      // or it was already in nested containment order, in which case we don't
-      // need to recompute the order or retain nesting information. Otherwise,
-      // we recompute the haystack ordering with nested_groups as the first col.
+      // If only a single nested group exists, we hit the somewhat rare case of
+      // having a >1 col data frame that is already in nested containment order.
+      // In that case, original haystack ordering is sufficient. Otherwise,
+      // recompute haystack ordering with `nested_groups` as the first column.
       nested_groups = r_list_get(nested_info, 0);
 
       r_obj* tweaked_haystack = KEEP_N(r_alloc_list(n_cols + 1), &n_prot);
@@ -228,7 +229,8 @@ r_obj* df_matches(r_obj* needles,
       o_haystack = KEEP_N(vec_order(tweaked_haystack, direction, na_value, nan_distinct, chr_transform), &n_prot);
     }
   } else {
-    // Nested group info isn't required for only `==` and `!=` ops
+    // Nested group info isn't required for only `==` and `!=` ops, or when
+    // there is only 1 column in the data frame
     o_haystack = KEEP_N(vec_order(haystack, direction, na_value, nan_distinct, chr_transform), &n_prot);
   }
 
