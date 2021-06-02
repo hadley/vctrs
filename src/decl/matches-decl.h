@@ -111,6 +111,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 static
 r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_ops);
 
+static
 r_obj* nested_containment_order(r_obj* proxy,
                                 r_obj* order,
                                 r_obj* group_sizes,

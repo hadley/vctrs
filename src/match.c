@@ -1136,6 +1136,14 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 
 // -----------------------------------------------------------------------------
 
+// [[ register() ]]
+r_obj* vctrs_test_compute_nested_containment_info(r_obj* haystack, r_obj* condition) {
+  r_ssize size_condition = vec_size(condition);
+  enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(size_condition, sizeof(enum vctrs_ops));
+  parse_condition(condition, size_condition, v_ops);
+  return compute_nested_containment_info(haystack, v_ops);
+}
+
 static
 r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_ops) {
   r_ssize n_prot = 0;
@@ -1300,7 +1308,7 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
 
 // -----------------------------------------------------------------------------
 
-// Currently assumes `proxy` is in completely increasing order
+static
 r_obj* nested_containment_order(r_obj* proxy,
                                 r_obj* order,
                                 r_obj* group_sizes,
