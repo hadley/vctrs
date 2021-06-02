@@ -468,8 +468,27 @@ void df_matches_recurse(r_ssize col,
   case VCTRS_OPS_neq: r_abort("not yet implemented");
   }
 
-  // TODO: Handle <=, < case to ensure NA haystack values aren't captured
-  // unless the needle value is also NA
+  if (!is_na_needle && (op == VCTRS_OPS_gt || op == VCTRS_OPS_gte)) {
+    // In this specific case, a non-NA needle may match an NA in the haystack
+    // from the condition adjustments made above. If there was an NA in the
+    // haystack, we avoid including it by shifting the lower bound to 1 past
+    // the final NA.
+    const r_ssize o_haystack_lower = v_o_haystack[grp_lower_o_haystack] - 1;
+    const int val_haystack_lower = v_haystack_col[o_haystack_lower];
+
+    if (int_is_missing(val_haystack_lower)) {
+      // If there was an NA in the haystack, find the last NA
+      grp_lower_o_haystack = int_locate_upper_na(
+        v_haystack_col,
+        v_o_haystack,
+        grp_lower_o_haystack,
+        grp_upper_o_haystack
+      );
+
+      // Exclude it and all before it
+      ++grp_lower_o_haystack;
+    }
+  }
 
   // Find lower and upper group bounds for the needle value
   grp_lower_o_needles = int_lower_duplicate(
@@ -763,6 +782,28 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
     grp_lower_o_haystack = grp_upper_o_haystack + 1;
     grp_upper_o_haystack = size_haystack - 1;
   }
+}
+
+// -----------------------------------------------------------------------------
+
+static inline
+r_ssize int_locate_upper_na(const int* v_haystack,
+                            const int* v_o_haystack,
+                            r_ssize lower_o_haystack,
+                            r_ssize upper_o_haystack) {
+  while (lower_o_haystack <= upper_o_haystack) {
+    const r_ssize mid_o_haystack = midpoint(lower_o_haystack, upper_o_haystack);
+    const r_ssize mid_haystack = v_o_haystack[mid_o_haystack] - 1;
+    const int elt_haystack = v_haystack[mid_haystack];
+
+    if (int_is_missing(elt_haystack)) {
+      lower_o_haystack = mid_o_haystack + 1;
+    } else {
+      upper_o_haystack = mid_o_haystack - 1;
+    }
+  }
+
+  return upper_o_haystack;
 }
 
 // -----------------------------------------------------------------------------

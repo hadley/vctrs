@@ -58,6 +58,12 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    bool* p_any_multiple);
 
 static inline
+r_ssize int_locate_upper_na(const int* v_haystack,
+                            const int* v_o_haystack,
+                            r_ssize lower_o_haystack,
+                            r_ssize upper_o_haystack);
+
+static inline
 r_ssize int_lower_duplicate(int needle,
                             const int* v_haystack,
                             const int* v_o_haystack,
