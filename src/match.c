@@ -381,12 +381,6 @@ void df_matches_recurse(r_ssize col,
                         r_ssize* p_n_extra,
                         bool* p_any_multiple) {
   const enum vctrs_ops op = v_ops[col];
-
-  r_ssize grp_lower_o_needles = lower_o_needles;
-  r_ssize grp_upper_o_needles = upper_o_needles;
-  r_ssize grp_lower_o_haystack = lower_o_haystack;
-  r_ssize grp_upper_o_haystack = upper_o_haystack;
-
   const r_ssize n_col = p_needles->n_col;
 
   // TODO: Generalize with this
@@ -395,10 +389,86 @@ void df_matches_recurse(r_ssize col,
   const int* v_needles_col = (const int*) p_needles->col_ptrs[col];
   const int* v_haystack_col = (const int*) p_haystack->col_ptrs[col];
 
-  const r_ssize mid_o_needles = midpoint(lower_o_needles, upper_o_needles);
-  const r_ssize mid_needles = v_o_needles[mid_o_needles] - 1;
-  const int val_needle = v_needles_col[mid_needles];
+  const r_ssize grp_mid_o_needles = midpoint(lower_o_needles, upper_o_needles);
+  const r_ssize grp_mid_needles = v_o_needles[grp_mid_o_needles] - 1;
+  const int val_needle = v_needles_col[grp_mid_needles];
+
   const bool is_na_needle = int_is_missing(val_needle);
+
+  // Find lower and upper group bounds for the needle value
+  r_ssize grp_lower_o_needles = int_lower_duplicate(
+    val_needle,
+    v_needles_col,
+    v_o_needles,
+    lower_o_needles,
+    grp_mid_o_needles
+  );
+  r_ssize grp_upper_o_needles = int_upper_duplicate(
+    val_needle,
+    v_needles_col,
+    v_o_needles,
+    grp_mid_o_needles,
+    upper_o_needles
+  );
+
+  if (!na_equal && is_na_needle) {
+    // Propagate NA, don't recursive into further columns.
+    // Learned nothing about haystack!
+    bool do_lhs = grp_lower_o_needles > lower_o_needles;
+    bool do_rhs = grp_upper_o_needles < upper_o_needles;
+
+    if (do_lhs) {
+      upper_o_needles = grp_lower_o_needles - 1;
+
+      df_matches_recurse(
+        col,
+        lower_o_needles,
+        upper_o_needles,
+        lower_o_haystack,
+        upper_o_haystack,
+        p_needles,
+        p_haystack,
+        v_o_needles,
+        v_o_haystack,
+        na_equal,
+        multiple,
+        v_ops,
+        p_o_haystack_starts,
+        p_match_sizes,
+        p_needles_locs,
+        p_n_extra,
+        p_any_multiple
+      );
+    }
+    if (do_rhs) {
+      lower_o_needles = grp_upper_o_needles + 1;
+
+      df_matches_recurse(
+        col,
+        lower_o_needles,
+        upper_o_needles,
+        lower_o_haystack,
+        upper_o_haystack,
+        p_needles,
+        p_haystack,
+        v_o_needles,
+        v_o_haystack,
+        na_equal,
+        multiple,
+        v_ops,
+        p_o_haystack_starts,
+        p_match_sizes,
+        p_needles_locs,
+        p_n_extra,
+        p_any_multiple
+      );
+    }
+
+    return;
+  }
+
+  r_ssize grp_lower_o_haystack = lower_o_haystack;
+  r_ssize grp_upper_o_haystack = upper_o_haystack;
 
   while (grp_lower_o_haystack <= grp_upper_o_haystack) {
     const r_ssize grp_mid_o_haystack = midpoint(grp_lower_o_haystack, grp_upper_o_haystack);
@@ -489,22 +559,6 @@ void df_matches_recurse(r_ssize col,
       ++grp_lower_o_haystack;
     }
   }
-
-  // Find lower and upper group bounds for the needle value
-  grp_lower_o_needles = int_lower_duplicate(
-    val_needle,
-    v_needles_col,
-    v_o_needles,
-    grp_lower_o_needles,
-    mid_o_needles
-  );
-  grp_upper_o_needles = int_upper_duplicate(
-    val_needle,
-    v_needles_col,
-    v_o_needles,
-    mid_o_needles,
-    grp_upper_o_needles
-  );
 
   if (grp_lower_o_haystack <= grp_upper_o_haystack) {
     // Hit!
