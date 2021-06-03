@@ -5,12 +5,16 @@ r_obj* vec_matches(r_obj* needles,
                    bool na_equal,
                    int no_match,
                    enum vctrs_multiple multiple,
+                   bool nan_distinct,
+                   r_obj* chr_transform,
                    struct vctrs_arg* needles_arg,
                    struct vctrs_arg* haystack_arg);
 
 static
 r_obj* df_matches(r_obj* needles,
                   r_obj* haystack,
+                  r_obj* needles_missings,
+                  r_obj* haystack_missings,
                   r_ssize size_needles,
                   r_ssize size_haystack,
                   bool na_equal,
@@ -26,6 +30,8 @@ void df_matches_recurse(r_ssize col,
                         r_ssize upper_o_haystack,
                         const struct poly_df_data* p_needles,
                         const struct poly_df_data* p_haystack,
+                        const struct poly_df_data* p_needles_missings,
+                        const struct poly_df_data* p_haystack_missings,
                         const int* v_o_needles,
                         const int* v_o_haystack,
                         bool na_equal,
@@ -46,6 +52,8 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    r_ssize upper_o_needles,
                                    const struct poly_df_data* p_needles,
                                    const struct poly_df_data* p_haystack,
+                                   const struct poly_df_data* p_needles_missings,
+                                   const struct poly_df_data* p_haystack_missings,
                                    const int* v_o_needles,
                                    const int* v_o_haystack,
                                    bool na_equal,
@@ -58,44 +66,39 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    bool* p_any_multiple);
 
 static inline
-r_ssize int_locate_upper_missing(int const* v_haystack,
+r_ssize int_locate_upper_missing(const int* v_haystack_missings,
                                  const int* v_o_haystack,
                                  r_ssize lower_o_haystack,
                                  r_ssize upper_o_haystack);
-static inline
-r_ssize dbl_locate_upper_missing(double const* v_haystack,
-                                 const int* v_o_haystack,
-                                 r_ssize lower_o_haystack,
-                                 r_ssize upper_o_haystack);
-
 static inline
 r_ssize int_lower_duplicate(int needle,
-                            int const* v_haystack,
+                            const int* v_haystack,
                             const int* v_o_haystack,
                             r_ssize lower_o_haystack,
                             r_ssize upper_o_haystack);
-static inline
-r_ssize dbl_lower_duplicate(double needle,
-                            double const* v_haystack,
-                            const int* v_o_haystack,
-                            r_ssize lower_o_haystack,
-                            r_ssize upper_o_haystack);
-
 static inline
 r_ssize int_upper_duplicate(int needle,
-                            int const* v_haystack,
-                            const int* v_o_haystack,
-                            r_ssize lower_o_haystack,
-                            r_ssize upper_o_haystack);
-static inline
-r_ssize dbl_upper_duplicate(double needle,
-                            double const* v_haystack,
+                            const int* v_haystack,
                             const int* v_o_haystack,
                             r_ssize lower_o_haystack,
                             r_ssize upper_o_haystack);
 
+static
+r_obj* df_joint_ranks(r_obj* x,
+                      r_obj* y,
+                      r_ssize x_size,
+                      r_ssize y_size,
+                      r_ssize n_cols,
+                      r_obj* ptype,
+                      bool na_propagate,
+                      bool nan_distinct,
+                      r_obj* chr_transform);
+
+static
+r_obj* df_missings_by_col(r_obj* x, r_ssize x_size, r_ssize n_cols);
+
 static inline
-void parse_condition(r_obj* condition, r_ssize size, enum vctrs_ops* v_ops);
+void parse_condition(r_obj* condition, enum vctrs_ops* v_ops, r_ssize n_cols);
 
 static inline
 enum vctrs_multiple parse_multiple(r_obj* multiple);
@@ -112,7 +115,7 @@ static
 r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_ops);
 
 static
-r_obj* nested_containment_order(r_obj* proxy,
+r_obj* nested_containment_order(r_obj* x,
                                 r_obj* order,
                                 r_obj* group_sizes,
                                 r_obj* outer_run_sizes);
@@ -122,3 +125,6 @@ int p_df_nested_containment_compare_ge_na_equal(const void* x,
                                                 r_ssize i,
                                                 const void* y,
                                                 r_ssize j);
+
+static inline
+r_ssize midpoint(r_ssize lhs, r_ssize rhs);

@@ -5,6 +5,8 @@ vec_matches <- function(needles,
                         na_equal = TRUE,
                         no_match = NA_integer_,
                         multiple = "all",
+                        nan_distinct = FALSE,
+                        chr_transform = NULL,
                         needles_arg = "",
                         haystack_arg = "") {
   if (!missing(...)) {
@@ -19,6 +21,8 @@ vec_matches <- function(needles,
     na_equal,
     no_match,
     multiple,
+    nan_distinct,
+    chr_transform,
     needles_arg,
     haystack_arg
   )

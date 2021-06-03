@@ -1,6 +1,7 @@
 #include <rlang.h>
 #include "vctrs.h"
 #include "utils.h"
+#include "rank.h"
 #include "poly-op.h"
 #include "compare.h"
 #include "ptype2.h"
@@ -32,13 +33,6 @@ enum vctrs_ops {
 
 // -----------------------------------------------------------------------------
 
-static inline
-r_ssize midpoint(r_ssize lhs, r_ssize rhs) {
-  return lhs + (rhs - lhs) / 2;
-}
-
-// -----------------------------------------------------------------------------
-
 // [[ register() ]]
 r_obj* vctrs_matches(r_obj* needles,
                      r_obj* haystack,
@@ -46,6 +40,8 @@ r_obj* vctrs_matches(r_obj* needles,
                      r_obj* na_equal,
                      r_obj* no_match,
                      r_obj* multiple,
+                     r_obj* nan_distinct,
+                     r_obj* chr_transform,
                      r_obj* needles_arg,
                      r_obj* haystack_arg) {
   bool c_na_equal = r_as_bool(na_equal);
@@ -54,6 +50,11 @@ r_obj* vctrs_matches(r_obj* needles,
     r_abort("`no_match` must be an integer of length 1.");
   }
   int c_no_match = r_int_get(no_match, 0);
+
+  if (!r_is_bool(nan_distinct)) {
+    r_abort("`nan_distinct` must be a single `TRUE` or `FALSE`.");
+  }
+  bool c_nan_distinct = r_lgl_get(nan_distinct, 0);
 
   struct vctrs_arg c_needles_arg = vec_as_arg(needles_arg);
   struct vctrs_arg c_haystack_arg = vec_as_arg(haystack_arg);
@@ -67,6 +68,8 @@ r_obj* vctrs_matches(r_obj* needles,
     c_na_equal,
     c_no_match,
     c_multiple,
+    c_nan_distinct,
+    chr_transform,
     &c_needles_arg,
     &c_haystack_arg
   );
@@ -79,12 +82,14 @@ r_obj* vec_matches(r_obj* needles,
                    bool na_equal,
                    int no_match,
                    enum vctrs_multiple multiple,
+                   bool nan_distinct,
+                   r_obj* chr_transform,
                    struct vctrs_arg* needles_arg,
                    struct vctrs_arg* haystack_arg) {
   int n_prot = 0;
 
   int _;
-  r_obj* common = KEEP_N(vec_ptype2_params(
+  r_obj* ptype = KEEP_N(vec_ptype2_params(
     needles,
     haystack,
     needles_arg,
@@ -95,7 +100,7 @@ r_obj* vec_matches(r_obj* needles,
 
   needles = KEEP_N(vec_cast_params(
     needles,
-    common,
+    ptype,
     needles_arg,
     args_empty,
     DF_FALLBACK_quiet,
@@ -104,28 +109,17 @@ r_obj* vec_matches(r_obj* needles,
 
   haystack = KEEP_N(vec_cast_params(
     haystack,
-    common,
+    ptype,
     haystack_arg,
     args_empty,
     DF_FALLBACK_quiet,
     S3_FALLBACK_false
   ), &n_prot);
 
-  // TODO: Generalize argument expansion code of `vec_order()` and use to
-  // expand `condition` in the presence of data frame needles/haystack.
-  // TODO: This should also validate the size of `condition`.
-
-  needles = KEEP_N(vec_proxy_compare(needles), &n_prot);
-  needles = KEEP_N(vec_normalize_encoding(needles), &n_prot);
-
-  haystack = KEEP_N(vec_proxy_compare(haystack), &n_prot);
-  haystack = KEEP_N(vec_normalize_encoding(haystack), &n_prot);
-
   r_ssize size_needles = vec_size(needles);
   r_ssize size_haystack = vec_size(haystack);
 
-  // Support non-data frame types by wrapping them in a data frame.
-  // This also re-wraps 1 column data frames that `vec_proxy_compare()` unwrapped.
+  // Support non-data frame types by wrapping them in a 1-col data frame
   if (!is_data_frame(needles)) {
     needles = KEEP_N(r_list(needles), &n_prot);
     r_poke_names(needles, r_chr("x"));
@@ -134,15 +128,47 @@ r_obj* vec_matches(r_obj* needles,
     haystack = KEEP_N(r_list(haystack), &n_prot);
     r_poke_names(haystack, r_chr("x"));
     r_init_data_frame(haystack, size_haystack);
+
+    ptype = KEEP_N(r_list(ptype), &n_prot);
+    r_poke_names(ptype, r_chr("x"));
+    r_init_data_frame(ptype, 0);
   }
 
-  r_ssize size_condition = vec_size(condition);
-  enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(size_condition, sizeof(enum vctrs_ops));
-  parse_condition(condition, size_condition, v_ops);
+  r_ssize n_cols = r_length(needles);
+
+  bool na_propagate = !na_equal;
+
+  // Compute the locations of missing values for each column if computing ranks
+  // later on is going to replace the missing values with integer ranks
+  r_obj* needles_missings = na_propagate ? r_null : df_missings_by_col(needles, size_needles, n_cols);
+  KEEP_N(needles_missings, &n_prot);
+
+  r_obj* haystack_missings = na_propagate ? r_null : df_missings_by_col(haystack, size_haystack, n_cols);
+  KEEP_N(haystack_missings, &n_prot);
+
+  // Compute joint ranks to simplify each column down to an integer vector
+  r_obj* args = KEEP_N(df_joint_ranks(
+    needles,
+    haystack,
+    size_needles,
+    size_haystack,
+    n_cols,
+    ptype,
+    na_propagate,
+    nan_distinct,
+    chr_transform
+  ), &n_prot);
+  needles = r_list_get(args, 0);
+  haystack = r_list_get(args, 1);
+
+  enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(n_cols, sizeof(enum vctrs_ops));
+  parse_condition(condition, v_ops, n_cols);
 
   r_obj* out = df_matches(
     needles,
     haystack,
+    needles_missings,
+    haystack_missings,
     size_needles,
     size_haystack,
     na_equal,
@@ -160,6 +186,8 @@ r_obj* vec_matches(r_obj* needles,
 static
 r_obj* df_matches(r_obj* needles,
                   r_obj* haystack,
+                  r_obj* needles_missings,
+                  r_obj* haystack_missings,
                   r_ssize size_needles,
                   r_ssize size_haystack,
                   bool na_equal,
@@ -232,6 +260,24 @@ r_obj* df_matches(r_obj* needles,
   PROTECT_POLY_VEC(p_poly_haystack, &n_prot);
   const struct poly_df_data* p_haystack = (const struct poly_df_data*) p_poly_haystack->p_vec;
 
+  const struct poly_df_data* p_needles_missings;
+  const struct poly_df_data* p_haystack_missings;
+
+  if (na_equal) {
+    // NAs were removed from the ranks, so grab them from the "missing" data frames
+    struct poly_vec* p_poly_needles_missings = new_poly_vec(needles_missings, vctrs_type_dataframe);
+    PROTECT_POLY_VEC(p_poly_needles_missings, &n_prot);
+    p_needles_missings = (const struct poly_df_data*) p_poly_needles_missings->p_vec;
+
+    struct poly_vec* p_poly_haystack_missings = new_poly_vec(haystack_missings, vctrs_type_dataframe);
+    PROTECT_POLY_VEC(p_poly_haystack_missings, &n_prot);
+    p_haystack_missings = (const struct poly_df_data*) p_poly_haystack_missings->p_vec;
+  } else {
+    // NAs propagated through the ranks, so we can use them directly
+    p_needles_missings = p_needles;
+    p_haystack_missings = p_haystack;
+  }
+
   r_ssize n_extra = 0;
   bool any_multiple = false;
 
@@ -251,6 +297,8 @@ r_obj* df_matches(r_obj* needles,
       upper_o_haystack,
       p_needles,
       p_haystack,
+      p_needles_missings,
+      p_haystack_missings,
       v_o_needles,
       v_o_haystack,
       na_equal,
@@ -272,6 +320,8 @@ r_obj* df_matches(r_obj* needles,
       upper_o_needles,
       p_needles,
       p_haystack,
+      p_needles_missings,
+      p_haystack_missings,
       v_o_needles,
       v_o_haystack,
       na_equal,
@@ -308,94 +358,6 @@ r_obj* df_matches(r_obj* needles,
 
 // -----------------------------------------------------------------------------
 
-#define DF_MATCHES_NEEDLE_BOUNDS(CTYPE, IS_MISSING, LOWER_DUPLICATE, UPPER_DUPLICATE) do { \
-  CTYPE const* v_needles = (CTYPE const*) p_needles->col_ptrs[col];                        \
-                                                                                           \
-  CTYPE const val_needle = v_needles[grp_mid_needles];                                     \
-  is_na_needle = IS_MISSING(val_needle);                                                   \
-                                                                                           \
-  /* Find lower and upper group bounds for the needle value */                             \
-  grp_lower_o_needles = LOWER_DUPLICATE(                                                   \
-    val_needle,                                                                            \
-    v_needles,                                                                             \
-    v_o_needles,                                                                           \
-    lower_o_needles,                                                                       \
-    grp_mid_o_needles                                                                      \
-  );                                                                                       \
-  grp_upper_o_needles = UPPER_DUPLICATE(                                                   \
-    val_needle,                                                                            \
-    v_needles,                                                                             \
-    v_o_needles,                                                                           \
-    grp_mid_o_needles,                                                                     \
-    upper_o_needles                                                                        \
-  );                                                                                       \
-} while (0)
-
-
-#define DF_MATCHES_HAYSTACK_BOUNDS(CTYPE, COMPARE, LOWER_DUPLICATE, UPPER_DUPLICATE) do {     \
-  CTYPE const* v_needles = (CTYPE const*) p_needles->col_ptrs[col];                           \
-  CTYPE const* v_haystack = (CTYPE const*) p_haystack->col_ptrs[col];                         \
-                                                                                              \
-  CTYPE const val_needle = v_needles[grp_mid_needles];                                        \
-                                                                                              \
-  grp_lower_o_haystack = lower_o_haystack;                                                    \
-  grp_upper_o_haystack = upper_o_haystack;                                                    \
-                                                                                              \
-  while (grp_lower_o_haystack <= grp_upper_o_haystack) {                                      \
-    const r_ssize grp_mid_o_haystack = midpoint(grp_lower_o_haystack, grp_upper_o_haystack);  \
-    const r_ssize grp_mid_haystack = v_o_haystack[grp_mid_o_haystack] - 1;                    \
-    CTYPE const val_haystack = v_haystack[grp_mid_haystack];                                  \
-                                                                                              \
-    const int cmp = COMPARE(val_needle, val_haystack);                                        \
-                                                                                              \
-    if (cmp == 1) {                                                                           \
-      grp_lower_o_haystack = grp_mid_o_haystack + 1;                                          \
-    } else if (cmp == -1) {                                                                   \
-      grp_upper_o_haystack = grp_mid_o_haystack - 1;                                          \
-    } else {                                                                                  \
-      /* Hit! */                                                                              \
-      /* Find lower and upper group bounds for the haystack value */                          \
-      grp_lower_o_haystack = LOWER_DUPLICATE(                                                 \
-        val_haystack,                                                                         \
-        v_haystack,                                                                           \
-        v_o_haystack,                                                                         \
-        grp_lower_o_haystack,                                                                 \
-        grp_mid_o_haystack                                                                    \
-      );                                                                                      \
-      grp_upper_o_haystack = UPPER_DUPLICATE(                                                 \
-        val_haystack,                                                                         \
-        v_haystack,                                                                           \
-        v_o_haystack,                                                                         \
-        grp_mid_o_haystack,                                                                   \
-        grp_upper_o_haystack                                                                  \
-      );                                                                                      \
-      break;                                                                                  \
-    }                                                                                         \
-  }                                                                                           \
-} while (0)
-
-
-#define DF_MATCHES_MISSING_EXCLUDE(CTYPE, IS_MISSING, LOCATE_UPPER_MISSING) do { \
-  CTYPE const* v_haystack = (CTYPE const*) p_haystack->col_ptrs[col];            \
-                                                                                 \
-  const r_ssize o_haystack_lower = v_o_haystack[grp_lower_o_haystack] - 1;       \
-  CTYPE const val_haystack_lower = v_haystack[o_haystack_lower];                 \
-                                                                                 \
-  if (IS_MISSING(val_haystack_lower)) {                                          \
-    /* If there was an NA in the haystack, find the last NA */                   \
-    grp_lower_o_haystack = LOCATE_UPPER_MISSING(                                 \
-      v_haystack,                                                                \
-      v_o_haystack,                                                              \
-      grp_lower_o_haystack,                                                      \
-      grp_upper_o_haystack                                                       \
-    );                                                                           \
-                                                                                 \
-    /* Exclude it and all before it */                                           \
-    ++grp_lower_o_haystack;                                                      \
-  }                                                                              \
-} while (0)
-
-
 static
 void df_matches_recurse(r_ssize col,
                         r_ssize lower_o_needles,
@@ -404,6 +366,8 @@ void df_matches_recurse(r_ssize col,
                         r_ssize upper_o_haystack,
                         const struct poly_df_data* p_needles,
                         const struct poly_df_data* p_haystack,
+                        const struct poly_df_data* p_needles_missings,
+                        const struct poly_df_data* p_haystack_missings,
                         const int* v_o_needles,
                         const int* v_o_haystack,
                         bool na_equal,
@@ -415,32 +379,37 @@ void df_matches_recurse(r_ssize col,
                         r_ssize* p_n_extra,
                         bool* p_any_multiple) {
   const enum vctrs_ops op = v_ops[col];
-  const enum vctrs_type type = p_needles->col_types[col];
   const r_ssize n_col = p_needles->n_col;
+
+  const int* v_needles = (const int*) p_needles->col_ptrs[col];
+  const int* v_needles_missings = (const int*) p_needles_missings->col_ptrs[col];
+
+  const int* v_haystack = (const int*) p_haystack->col_ptrs[col];
+  const int* v_haystack_missings = (const int*) p_haystack_missings->col_ptrs[col];
 
   const r_ssize grp_mid_o_needles = midpoint(lower_o_needles, upper_o_needles);
   const r_ssize grp_mid_needles = v_o_needles[grp_mid_o_needles] - 1;
 
-  // Set by the switch below
-  bool is_na_needle;
-  r_ssize grp_lower_o_needles;
-  r_ssize grp_upper_o_needles;
+  const int val_needle = v_needles[grp_mid_needles];
+  const bool needle_is_missing = int_is_missing(v_needles_missings[grp_mid_needles]);
 
-  switch (type) {
-  case vctrs_type_integer: {
-    DF_MATCHES_NEEDLE_BOUNDS(int, int_is_missing, int_lower_duplicate, int_upper_duplicate);
-    break;
-  }
-  case vctrs_type_double: {
-    DF_MATCHES_NEEDLE_BOUNDS(double, dbl_is_missing, dbl_lower_duplicate, dbl_upper_duplicate);
-    break;
-  }
-  default: {
-    stop_unimplemented_vctrs_type("df_matches_recurse", type);
-  }
-  }
+  // Find lower and upper group bounds for the needle value
+  const r_ssize grp_lower_o_needles = int_lower_duplicate(
+    val_needle,
+    v_needles,
+    v_o_needles,
+    lower_o_needles,
+    grp_mid_o_needles
+  );
+  const r_ssize grp_upper_o_needles = int_upper_duplicate(
+    val_needle,
+    v_needles,
+    v_o_needles,
+    grp_mid_o_needles,
+    upper_o_needles
+  );
 
-  if (!na_equal && is_na_needle) {
+  if (!na_equal && needle_is_missing) {
     // Propagate NA, don't recursive into further columns.
     // Learned nothing about haystack!
     bool do_lhs = grp_lower_o_needles > lower_o_needles;
@@ -457,6 +426,8 @@ void df_matches_recurse(r_ssize col,
         upper_o_haystack,
         p_needles,
         p_haystack,
+        p_needles_missings,
+        p_haystack_missings,
         v_o_needles,
         v_o_haystack,
         na_equal,
@@ -480,6 +451,8 @@ void df_matches_recurse(r_ssize col,
         upper_o_haystack,
         p_needles,
         p_haystack,
+        p_needles_missings,
+        p_haystack_missings,
         v_o_needles,
         v_o_haystack,
         na_equal,
@@ -496,22 +469,39 @@ void df_matches_recurse(r_ssize col,
     return;
   }
 
-  // Set by the switch below
-  r_ssize grp_lower_o_haystack;
-  r_ssize grp_upper_o_haystack;
+  r_ssize grp_lower_o_haystack = lower_o_haystack;
+  r_ssize grp_upper_o_haystack = upper_o_haystack;
 
-  switch (type) {
-  case vctrs_type_integer: {
-    DF_MATCHES_HAYSTACK_BOUNDS(int, int_compare_na_smallest, int_lower_duplicate, int_upper_duplicate);
-    break;
-  }
-  case vctrs_type_double: {
-    DF_MATCHES_HAYSTACK_BOUNDS(double, dbl_compare_na_smallest_nan_distinct, dbl_lower_duplicate, dbl_upper_duplicate);
-    break;
-  }
-  default: {
-    stop_unimplemented_vctrs_type("df_matches_recurse", type);
-  }
+  while (grp_lower_o_haystack <= grp_upper_o_haystack) {
+    const r_ssize grp_mid_o_haystack = midpoint(grp_lower_o_haystack, grp_upper_o_haystack);
+    const r_ssize grp_mid_haystack = v_o_haystack[grp_mid_o_haystack] - 1;
+    const int val_haystack = v_haystack[grp_mid_haystack];
+
+    const int cmp = int_compare_na_equal(val_needle, val_haystack);
+
+    if (cmp == 1) {
+      grp_lower_o_haystack = grp_mid_o_haystack + 1;
+    } else if (cmp == -1) {
+      grp_upper_o_haystack = grp_mid_o_haystack - 1;
+    } else {
+      // Hit!
+      // Find lower and upper group bounds for the haystack value
+      grp_lower_o_haystack = int_lower_duplicate(
+        val_haystack,
+        v_haystack,
+        v_o_haystack,
+        grp_lower_o_haystack,
+        grp_mid_o_haystack
+      );
+      grp_upper_o_haystack = int_upper_duplicate(
+        val_haystack,
+        v_haystack,
+        v_o_haystack,
+        grp_mid_o_haystack,
+        grp_upper_o_haystack
+      );
+      break;
+    }
   }
 
   // Adjust bounds based on non-equi condition.
@@ -521,13 +511,13 @@ void df_matches_recurse(r_ssize col,
   case VCTRS_OPS_lt: {
     // Exclude found needle
     grp_lower_o_haystack = grp_upper_o_haystack + 1;
-    if (!is_na_needle) {
+    if (!needle_is_missing) {
       grp_upper_o_haystack = upper_o_haystack;
     }
     break;
   }
   case VCTRS_OPS_lte: {
-    if (!is_na_needle) {
+    if (!needle_is_missing) {
       grp_upper_o_haystack = upper_o_haystack;
     }
     break;
@@ -535,13 +525,13 @@ void df_matches_recurse(r_ssize col,
   case VCTRS_OPS_gt: {
     // Exclude found needle
     grp_upper_o_haystack = grp_lower_o_haystack - 1;
-    if (!is_na_needle) {
+    if (!needle_is_missing) {
       grp_lower_o_haystack = lower_o_haystack;
     }
     break;
   }
   case VCTRS_OPS_gte: {
-    if (!is_na_needle) {
+    if (!needle_is_missing) {
       grp_lower_o_haystack = lower_o_haystack;
     }
     break;
@@ -550,23 +540,25 @@ void df_matches_recurse(r_ssize col,
   case VCTRS_OPS_neq: r_abort("not yet implemented");
   }
 
-  if (!is_na_needle && (op == VCTRS_OPS_gt || op == VCTRS_OPS_gte)) {
+  if (!needle_is_missing && (op == VCTRS_OPS_gt || op == VCTRS_OPS_gte)) {
     // In this specific case, a non-NA needle may match an NA in the haystack
     // from the condition adjustments made above. If there was an NA in the
     // haystack, we avoid including it by shifting the lower bound to 1 past
     // the final NA.
-    switch (type) {
-    case vctrs_type_integer: {
-      DF_MATCHES_MISSING_EXCLUDE(int, int_is_missing, int_locate_upper_missing);
-      break;
-    }
-    case vctrs_type_double: {
-      DF_MATCHES_MISSING_EXCLUDE(double, dbl_is_missing, dbl_locate_upper_missing);
-      break;
-    }
-    default: {
-      stop_unimplemented_vctrs_type("df_matches_recurse", type);
-    }
+    const r_ssize o_haystack_lower = v_o_haystack[grp_lower_o_haystack] - 1;
+    const int val_haystack_missings_lower = v_haystack_missings[o_haystack_lower];
+
+    if (int_is_missing(val_haystack_missings_lower)) {
+      /* If there was an NA in the haystack, find the last NA */
+      grp_lower_o_haystack = int_locate_upper_missing(
+        v_haystack_missings,
+        v_o_haystack,
+        grp_lower_o_haystack,
+        grp_upper_o_haystack
+      );
+
+      /* Exclude it and all before it */
+      ++grp_lower_o_haystack;
     }
   }
 
@@ -582,6 +574,8 @@ void df_matches_recurse(r_ssize col,
         grp_upper_o_haystack,
         p_needles,
         p_haystack,
+        p_needles_missings,
+        p_haystack_missings,
         v_o_needles,
         v_o_haystack,
         na_equal,
@@ -726,6 +720,8 @@ void df_matches_recurse(r_ssize col,
       lhs_upper_o_haystack,
       p_needles,
       p_haystack,
+      p_needles_missings,
+      p_haystack_missings,
       v_o_needles,
       v_o_haystack,
       na_equal,
@@ -747,6 +743,8 @@ void df_matches_recurse(r_ssize col,
       rhs_upper_o_haystack,
       p_needles,
       p_haystack,
+      p_needles_missings,
+      p_haystack_missings,
       v_o_needles,
       v_o_haystack,
       na_equal,
@@ -761,10 +759,6 @@ void df_matches_recurse(r_ssize col,
   }
 }
 
-#undef DF_MATCHES_NEEDLE_BOUNDS
-#undef DF_MATCHES_HAYSTACK_BOUNDS
-#undef DF_MATCHES_MISSING_EXCLUDE
-
 // -----------------------------------------------------------------------------
 
 static
@@ -776,6 +770,8 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    r_ssize upper_o_needles,
                                    const struct poly_df_data* p_needles,
                                    const struct poly_df_data* p_haystack,
+                                   const struct poly_df_data* p_needles_missings,
+                                   const struct poly_df_data* p_haystack_missings,
                                    const int* v_o_needles,
                                    const int* v_o_haystack,
                                    bool na_equal,
@@ -786,7 +782,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    struct r_dyn_array* p_needles_locs,
                                    r_ssize* p_n_extra,
                                    bool* p_any_multiple) {
-  const int* v_haystack_col = v_nested_groups;
+  const int* v_haystack = v_nested_groups;
 
   r_ssize grp_lower_o_haystack = 0;
   r_ssize grp_upper_o_haystack = size_haystack - 1;
@@ -797,7 +793,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
     while (grp_lower_o_haystack <= grp_upper_o_haystack) {
       const r_ssize grp_mid_o_haystack = midpoint(grp_lower_o_haystack, grp_upper_o_haystack);
       const r_ssize grp_mid_haystack = v_o_haystack[grp_mid_o_haystack] - 1;
-      const int val_haystack = v_haystack_col[grp_mid_haystack];
+      const int val_haystack = v_haystack[grp_mid_haystack];
 
       const int cmp = int_compare_na_equal(val_needle, val_haystack);
 
@@ -810,14 +806,14 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
         // Find lower and upper group bounds
         grp_lower_o_haystack = int_lower_duplicate(
           val_haystack,
-          v_haystack_col,
+          v_haystack,
           v_o_haystack,
           grp_lower_o_haystack,
           grp_mid_o_haystack
         );
         grp_upper_o_haystack = int_upper_duplicate(
           val_haystack,
-          v_haystack_col,
+          v_haystack,
           v_o_haystack,
           grp_mid_o_haystack,
           grp_upper_o_haystack
@@ -834,6 +830,8 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
       grp_upper_o_haystack,
       p_needles,
       p_haystack,
+      p_needles_missings,
+      p_haystack_missings,
       v_o_needles,
       v_o_haystack,
       na_equal,
@@ -855,143 +853,213 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
 // -----------------------------------------------------------------------------
 
 // Find the largest contiguous location containing a missing value
-#define LOCATE_UPPER_MISSING(CTYPE, IS_MISSING) do {                             \
-  while (lower_o_haystack <= upper_o_haystack) {                                 \
-    const r_ssize mid_o_haystack = midpoint(lower_o_haystack, upper_o_haystack); \
-    const r_ssize mid_haystack = v_o_haystack[mid_o_haystack] - 1;               \
-    CTYPE const elt_haystack = v_haystack[mid_haystack];                         \
-                                                                                 \
-    if (IS_MISSING(elt_haystack)) {                                              \
-      lower_o_haystack = mid_o_haystack + 1;                                     \
-    } else {                                                                     \
-      upper_o_haystack = mid_o_haystack - 1;                                     \
-    }                                                                            \
-  }                                                                              \
-                                                                                 \
-  return upper_o_haystack;                                                       \
-} while (0)
-
-
 static inline
-r_ssize int_locate_upper_missing(int const* v_haystack,
+r_ssize int_locate_upper_missing(const int* v_haystack_missings,
                                  const int* v_o_haystack,
                                  r_ssize lower_o_haystack,
                                  r_ssize upper_o_haystack) {
-  LOCATE_UPPER_MISSING(int, int_is_missing);
-}
-static inline
-r_ssize dbl_locate_upper_missing(double const* v_haystack,
-                                 const int* v_o_haystack,
-                                 r_ssize lower_o_haystack,
-                                 r_ssize upper_o_haystack) {
-  // We want NA and NaN to both be considered missing here
-  LOCATE_UPPER_MISSING(double, dbl_is_missing);
-}
+  while (lower_o_haystack <= upper_o_haystack) {
+    const r_ssize mid_o_haystack = midpoint(lower_o_haystack, upper_o_haystack);
+    const r_ssize mid_haystack = v_o_haystack[mid_o_haystack] - 1;
+    const int elt_haystack_missings = v_haystack_missings[mid_haystack];
 
+    if (int_is_missing(elt_haystack_missings)) {
+      lower_o_haystack = mid_o_haystack + 1;
+    } else {
+      upper_o_haystack = mid_o_haystack - 1;
+    }
+  }
 
-#undef LOCATE_UPPER_MISSING
+  return upper_o_haystack;
+}
 
 // -----------------------------------------------------------------------------
 
 // Find the smallest contiguous location containing `needle`
-#define LOWER_DUPLICATE(CTYPE, EQUAL) do {                                        \
-  while (lower_o_haystack <= upper_o_haystack) {                                  \
-    const r_ssize mid_o_haystack = midpoint(lower_o_haystack, upper_o_haystack);  \
-    const r_ssize mid_haystack = v_o_haystack[mid_o_haystack] - 1;                \
-    CTYPE const elt_haystack = v_haystack[mid_haystack];                          \
-                                                                                  \
-    if (EQUAL(needle, elt_haystack)) {                                            \
-      upper_o_haystack = mid_o_haystack - 1;                                      \
-    } else {                                                                      \
-      lower_o_haystack = mid_o_haystack + 1;                                      \
-    }                                                                             \
-  }                                                                               \
-                                                                                  \
-  return lower_o_haystack;                                                        \
-} while (0)
-
-
 static inline
 r_ssize int_lower_duplicate(int needle,
-                            int const* v_haystack,
+                            const int* v_haystack,
                             const int* v_o_haystack,
                             r_ssize lower_o_haystack,
                             r_ssize upper_o_haystack) {
-  LOWER_DUPLICATE(int, int_equal_na_equal);
-}
-static inline
-r_ssize dbl_lower_duplicate(double needle,
-                            double const* v_haystack,
-                            const int* v_o_haystack,
-                            r_ssize lower_o_haystack,
-                            r_ssize upper_o_haystack) {
-  LOWER_DUPLICATE(double, dbl_equal_na_equal);
-}
+  while (lower_o_haystack <= upper_o_haystack) {
+    const r_ssize mid_o_haystack = midpoint(lower_o_haystack, upper_o_haystack);
+    const r_ssize mid_haystack = v_o_haystack[mid_o_haystack] - 1;
+    const int elt_haystack = v_haystack[mid_haystack];
 
+    if (int_equal_na_equal(needle, elt_haystack)) {
+      upper_o_haystack = mid_o_haystack - 1;
+    } else {
+      lower_o_haystack = mid_o_haystack + 1;
+    }
+  }
 
-#undef LOWER_DUPLICATE
+  return lower_o_haystack;
+}
 
 // -----------------------------------------------------------------------------
 
 // Find the largest contiguous location containing `needle`
-#define UPPER_DUPLICATE(CTYPE, EQUAL) do {                                       \
-  while (lower_o_haystack <= upper_o_haystack) {                                 \
-    const r_ssize mid_o_haystack = midpoint(lower_o_haystack, upper_o_haystack); \
-    const r_ssize mid_haystack = v_o_haystack[mid_o_haystack] - 1;               \
-    CTYPE const elt_haystack = v_haystack[mid_haystack];                         \
-                                                                                 \
-    if (EQUAL(needle, elt_haystack)) {                                           \
-      lower_o_haystack = mid_o_haystack + 1;                                     \
-    } else {                                                                     \
-      upper_o_haystack = mid_o_haystack - 1;                                     \
-    }                                                                            \
-  }                                                                              \
-                                                                                 \
-  return upper_o_haystack;                                                       \
-} while (0)
-
-
 static inline
 r_ssize int_upper_duplicate(int needle,
-                            int const* v_haystack,
+                            const int* v_haystack,
                             const int* v_o_haystack,
                             r_ssize lower_o_haystack,
                             r_ssize upper_o_haystack) {
-  UPPER_DUPLICATE(int, int_equal_na_equal);
-}
-static inline
-r_ssize dbl_upper_duplicate(double needle,
-                            double const* v_haystack,
-                            const int* v_o_haystack,
-                            r_ssize lower_o_haystack,
-                            r_ssize upper_o_haystack) {
-  UPPER_DUPLICATE(double, dbl_equal_na_equal);
+  while (lower_o_haystack <= upper_o_haystack) {
+    const r_ssize mid_o_haystack = midpoint(lower_o_haystack, upper_o_haystack);
+    const r_ssize mid_haystack = v_o_haystack[mid_o_haystack] - 1;
+    const int elt_haystack = v_haystack[mid_haystack];
+
+    if (int_equal_na_equal(needle, elt_haystack)) {
+      lower_o_haystack = mid_o_haystack + 1;
+    } else {
+      upper_o_haystack = mid_o_haystack - 1;
+    }
+  }
+
+  return upper_o_haystack;
 }
 
-#undef UPPER_DUPLICATE
+// -----------------------------------------------------------------------------
+
+static
+r_obj* df_joint_ranks(r_obj* x,
+                      r_obj* y,
+                      r_ssize x_size,
+                      r_ssize y_size,
+                      r_ssize n_cols,
+                      r_obj* ptype,
+                      bool na_propagate,
+                      bool nan_distinct,
+                      r_obj* chr_transform) {
+  r_obj* out = KEEP(r_alloc_list(2));
+
+  x = r_clone(x);
+  r_list_poke(out, 0, x);
+
+  y = r_clone(y);
+  r_list_poke(out, 1, y);
+
+  r_obj* x_slicer = KEEP(compact_seq(0, x_size, true));
+  r_obj* y_slicer = KEEP(compact_seq(x_size, y_size, true));
+
+  r_obj* const* v_x = r_list_cbegin(x);
+  r_obj* const* v_y = r_list_cbegin(y);
+  r_obj* const* v_ptype = r_list_cbegin(ptype);
+
+  r_obj* zap = KEEP(r_alloc_list(0));
+  r_poke_class(zap, r_chr("rlang_zap"));
+
+  r_obj* c_args = KEEP(r_alloc_list(2));
+
+  // vec_rank() setup
+  r_obj* const direction = KEEP(r_chr("asc"));
+  r_obj* const na_value = KEEP(r_chr("smallest"));
+
+  for (r_ssize i = 0; i < n_cols; ++i) {
+    r_obj* x_elt = v_x[i];
+    r_obj* y_elt = v_y[i];
+    r_obj* ptype_elt = v_ptype[i];
+
+    r_list_poke(c_args, 0, x_elt);
+    r_list_poke(c_args, 1, y_elt);
+
+    // Combine columns
+    r_obj* both = KEEP(vec_c(c_args, ptype_elt, zap, p_no_repair_silent_ops));
+
+    // Compute joint rank
+    r_obj* rank = KEEP(vec_rank(
+      both,
+      TIES_dense,
+      na_propagate,
+      direction,
+      na_value,
+      nan_distinct,
+      chr_transform
+    ));
+
+    // Separate and store back in x and y
+    r_list_poke(x, i, vec_slice_impl(rank, x_slicer));
+    r_list_poke(y, i, vec_slice_impl(rank, y_slicer));
+
+    FREE(2);
+  }
+
+  FREE(7);
+  return out;
+}
+
+// -----------------------------------------------------------------------------
+
+static
+r_obj* df_missings_by_col(r_obj* x, r_ssize x_size, r_ssize n_cols) {
+  r_obj* out = KEEP(r_alloc_list(n_cols));
+  r_poke_names(out, r_names(x));
+  r_init_data_frame(out, x_size);
+
+  r_obj* const* v_x = r_list_cbegin(x);
+
+  for (r_ssize i = 0; i < n_cols; ++i) {
+    r_obj* col = v_x[i];
+
+    r_obj* missing = vec_equal_na(col);
+    r_list_poke(out, i, missing);
+    int* v_missing = r_lgl_begin(missing);
+
+    // Flip any TRUE to NA_integer_ to align with propagated integer NAs in
+    // `x` ranks when `na_equal = FALSE`.
+    // Relies on the fact that logical and integer are the same type internally.
+    for (r_ssize j = 0; j < x_size; ++j) {
+      if (v_missing[j]) {
+        v_missing[j] = r_globals.na_int;
+      }
+    }
+  }
+
+  FREE(1);
+  return out;
+}
 
 // -----------------------------------------------------------------------------
 
 static inline
-void parse_condition(r_obj* condition, r_ssize size, enum vctrs_ops* v_ops) {
+enum vctrs_ops parse_condition_one(const char* condition) {
+  if (!strcmp(condition, "==")) { return VCTRS_OPS_eq; }
+  if (!strcmp(condition, "!=")) { return VCTRS_OPS_neq; }
+  if (!strcmp(condition, ">"))  { return VCTRS_OPS_gt; }
+  if (!strcmp(condition, ">=")) { return VCTRS_OPS_gte; }
+  if (!strcmp(condition, "<"))  { return VCTRS_OPS_lt; }
+  if (!strcmp(condition, "<=")) { return VCTRS_OPS_lte; }
+
+  r_abort("`condition` must only contain \"==\", \"!=\", \">\", \">=\", \"<\", or \"<=\".");
+}
+
+static inline
+void parse_condition(r_obj* condition, enum vctrs_ops* v_ops, r_ssize n_cols) {
   if (r_typeof(condition) != R_TYPE_character) {
     r_abort("`condition` must be a character vector.");
   }
 
   r_obj* const* v_condition = r_chr_cbegin(condition);
+  r_ssize size_condition = vec_size(condition);
 
-  for (r_ssize i = 0; i < size; ++i) {
-    r_obj* elt = v_condition[i];
-    const char* c_elt = CHAR(elt);
-
-    if (!strcmp(c_elt, "==")) { v_ops[i] = VCTRS_OPS_eq;  continue; }
-    if (!strcmp(c_elt, "!=")) { v_ops[i] = VCTRS_OPS_neq; continue; }
-    if (!strcmp(c_elt, ">"))  { v_ops[i] = VCTRS_OPS_gt;  continue; }
-    if (!strcmp(c_elt, ">=")) { v_ops[i] = VCTRS_OPS_gte; continue; }
-    if (!strcmp(c_elt, "<"))  { v_ops[i] = VCTRS_OPS_lt;  continue; }
-    if (!strcmp(c_elt, "<=")) { v_ops[i] = VCTRS_OPS_lte; continue; }
-
-    r_abort("`condition` must only contain \"==\", \"!=\", \">\", \">=\", \"<\", or \"<=\".");
+  if (size_condition == 1) {
+    const char* elt = CHAR(v_condition[0]);
+    enum vctrs_ops op = parse_condition_one(elt);
+    for (r_ssize i = 0; i < n_cols; ++i) {
+      v_ops[i] = op;
+    }
+  } else if (size_condition == n_cols) {
+    for (r_ssize i = 0; i < n_cols; ++i) {
+      const char* elt = CHAR(v_condition[i]);
+      v_ops[i] = parse_condition_one(elt);
+    }
+  } else {
+    r_abort(
+      "`condition` must be length 1, or the same length "
+      "as the number of columns of the input."
+    );
   }
 }
 
@@ -1138,9 +1206,9 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 
 // [[ register() ]]
 r_obj* vctrs_test_compute_nested_containment_info(r_obj* haystack, r_obj* condition) {
-  r_ssize size_condition = vec_size(condition);
-  enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(size_condition, sizeof(enum vctrs_ops));
-  parse_condition(condition, size_condition, v_ops);
+  r_ssize n_cols = r_length(haystack);
+  enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(n_cols, sizeof(enum vctrs_ops));
+  parse_condition(condition, v_ops, n_cols);
   return compute_nested_containment_info(haystack, v_ops);
 }
 
@@ -1309,17 +1377,17 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
 // -----------------------------------------------------------------------------
 
 static
-r_obj* nested_containment_order(r_obj* proxy,
+r_obj* nested_containment_order(r_obj* x,
                                 r_obj* order,
                                 r_obj* group_sizes,
                                 r_obj* outer_run_sizes) {
-  if (!is_data_frame(proxy)) {
-    r_stop_internal("nested_containment_order", "`proxy` must be a data frame.");
+  if (!is_data_frame(x)) {
+    r_stop_internal("nested_containment_order", "`x` must be a data frame.");
   }
 
   int n_prot = 0;
 
-  r_ssize n_cols = r_length(proxy);
+  r_ssize n_cols = r_length(x);
   r_ssize size = r_length(order);
 
   r_obj* out = KEEP_N(r_alloc_list(2), &n_prot);
@@ -1343,9 +1411,9 @@ r_obj* nested_containment_order(r_obj* proxy,
     return out;
   }
   if (n_cols == 1) {
-    // If there is only 1 column, the proxy is in increasing order already.
+    // If there is only 1 column, x is in increasing order already.
     // If `outer_run_sizes` were supplied, each individual run group will
-    // be in increasing order (since the single proxy column is the one that
+    // be in increasing order (since the single x column is the one that
     // broke any ties), and that is all that is required.
     FREE(n_prot);
     return out;
@@ -1360,9 +1428,9 @@ r_obj* nested_containment_order(r_obj* proxy,
   struct growable prev_rows = new_growable(INTSXP, 10000);
   PROTECT_GROWABLE(&prev_rows, &n_prot);
 
-  struct poly_vec* p_poly_vec = new_poly_vec(proxy, vctrs_type_dataframe);
+  struct poly_vec* p_poly_vec = new_poly_vec(x, vctrs_type_dataframe);
   PROTECT_POLY_VEC(p_poly_vec, &n_prot);
-  const void* v_proxy = p_poly_vec->p_vec;
+  const void* v_x = p_poly_vec->p_vec;
 
   int i_order = v_group_sizes[0];
   growable_push_int(&prev_rows, v_order[0] - 1);
@@ -1386,7 +1454,7 @@ r_obj* nested_containment_order(r_obj* proxy,
     for (; prev_row_id < max_prev_row_id; ++prev_row_id) {
       int prev_row = growable_get_int(&prev_rows, prev_row_id);
 
-      if (p_df_nested_containment_compare_ge_na_equal(v_proxy, cur_row, v_proxy, prev_row)) {
+      if (p_df_nested_containment_compare_ge_na_equal(v_x, cur_row, v_x, prev_row)) {
         new_id = false;
         break;
       }
@@ -1436,24 +1504,29 @@ int p_df_nested_containment_compare_ge_na_equal(const void* x,
   // Assumes inputs are ordered, so first column can be ignored.
   // Iterates backwards to ideally maximize chance of hitting the fastest
   // varying column.
+  // All columns are integer vectors (ranks).
 
   struct poly_df_data* x_data = (struct poly_df_data*) x;
   struct poly_df_data* y_data = (struct poly_df_data*) y;
 
   r_ssize n_col = x_data->n_col;
-  enum vctrs_type* types = x_data->col_types;
 
   const void** x_ptrs = x_data->col_ptrs;
   const void** y_ptrs = y_data->col_ptrs;
 
-  const bool nan_distinct = true;
-
-  // df-cols should already be flattened
   for (r_ssize col = n_col - 1; col > 0; --col) {
-    if (p_compare_na_smallest(x_ptrs[col], i, y_ptrs[col], j, types[col], nan_distinct) < 0) {
+    if (p_int_compare_na_equal(x_ptrs[col], i, y_ptrs[col], j) < 0) {
       return false;
     }
   }
 
   return true;
 }
+
+// -----------------------------------------------------------------------------
+
+static inline
+r_ssize midpoint(r_ssize lhs, r_ssize rhs) {
+  return lhs + (rhs - lhs) / 2;
+}
+
