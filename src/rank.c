@@ -1,14 +1,6 @@
-#include <rlang.h>
-#include "vctrs.h"
+#include "rank.h"
 #include "complete.h"
 #include "order-radix.h"
-
-enum ties {
-  TIES_min,
-  TIES_max,
-  TIES_sequential,
-  TIES_dense
-};
 
 #include "decl/rank-decl.h"
 
@@ -35,7 +27,6 @@ r_obj* vctrs_rank(r_obj* x,
   );
 }
 
-static
 r_obj* vec_rank(r_obj* x,
                 enum ties ties_type,
                 bool na_propagate,
