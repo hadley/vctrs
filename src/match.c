@@ -397,6 +397,11 @@ void df_matches_recurse(r_ssize col,
                         struct r_dyn_array* p_needles_locs,
                         r_ssize* p_n_extra,
                         bool* p_any_multiple) {
+  if (lower_o_needles > upper_o_needles) {
+    // Only occurs if there are 0 rows in `needles`. Nothing to do.
+    return;
+  }
+
   const enum vctrs_ops op = v_ops[col];
   const r_ssize n_col = p_needles->n_col;
 
@@ -492,6 +497,13 @@ void df_matches_recurse(r_ssize col,
       );
     }
 
+    return;
+  }
+
+  if (lower_o_haystack > upper_o_haystack) {
+    // Only occurs when there are 0 rows in the `haystack`.
+    // No matches will be detected, so end early,
+    // but allow potential NA needle propagation to occur.
     return;
   }
 

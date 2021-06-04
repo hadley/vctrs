@@ -518,3 +518,43 @@ test_that("`no_match = 'error'` passes propagated NAs through untouched", {
   expect_identical(res$needles, 1:4)
   expect_identical(res$haystack, c(rep(NA, 3), 2L))
 })
+
+# ------------------------------------------------------------------------------
+# vec_matches() - edge cases
+
+test_that("zero row `needles` results in zero row data frame output", {
+  res <- vec_matches(integer(), 1:3)
+
+  expect_identical(res$needles, integer())
+  expect_identical(res$haystack, integer())
+
+  res <- vec_matches(integer(), 1:3, condition = "<")
+
+  expect_identical(res$needles, integer())
+  expect_identical(res$haystack, integer())
+})
+
+test_that("zero row `haystack` results in no-matches for all needles", {
+  res <- vec_matches(1:3, integer())
+
+  expect_identical(res$needles, 1:3)
+  expect_identical(res$haystack, rep(NA_integer_, 3))
+
+  res <- vec_matches(1:3, integer(), condition = "<")
+
+  expect_identical(res$needles, 1:3)
+  expect_identical(res$haystack, rep(NA_integer_, 3))
+})
+
+test_that("zero row `haystack` still allows needle NA propagation", {
+  res <- vec_matches(c(1, NA), integer(), na_equal = FALSE, no_match = 0L)
+
+  expect_identical(res$needles, 1:2)
+  expect_identical(res$haystack, c(0L, NA))
+
+  res <- vec_matches(c(1, NA), integer(), na_equal = FALSE, no_match = 0L, condition = "<")
+
+  expect_identical(res$needles, 1:2)
+  expect_identical(res$haystack, c(0L, NA))
+})
+
