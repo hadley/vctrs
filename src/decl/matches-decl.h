@@ -111,6 +111,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
+                              bool na_equal,
                               const struct vctrs_no_match* no_match,
                               bool any_multiple);
 

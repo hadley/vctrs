@@ -131,6 +131,12 @@ test_that("complex missing values match correctly", {
   res <- vec_matches(x, y, condition = "==", na_equal = FALSE)
   expect_identical(res$needles, 1:4)
   expect_identical(res$haystack, rep(NA_integer_, 4))
+
+  # Propagated missings are never considered no-matches
+  expect_identical(
+    vec_matches(x, y, condition = "==", na_equal = FALSE, no_match = "error"),
+    vec_matches(x, y, condition = "==", na_equal = FALSE)
+  )
 })
 
 # ------------------------------------------------------------------------------
@@ -486,6 +492,13 @@ test_that("can control `no_match`", {
   expect_identical(x$haystack, c(1L, 0L, 0L))
 })
 
+test_that("can differentiate between `no_match` and propagated NAs", {
+  res <- vec_matches(c(1, NA), 2, na_equal = FALSE, no_match = -1L)
+
+  expect_identical(res$needles, 1:2)
+  expect_identical(res$haystack, c(-1L, NA))
+})
+
 test_that("`no_match` can error", {
   expect_error(
     vec_matches(1, 2, no_match = "error"),
@@ -493,9 +506,9 @@ test_that("`no_match` can error", {
   )
 })
 
-test_that("`no_match = 'error'` errors on propagated NAs", {
-  expect_error(
-    vec_matches(NA, NA, na_equal = FALSE, no_match = "error"),
-    "no matches"
-  )
+test_that("`no_match = 'error'` passes propagated NAs through untouched", {
+  res <- vec_matches(c(NA, NaN, NA, 1), c(NA, 1), na_equal = FALSE, no_match = "error")
+
+  expect_identical(res$needles, 1:4)
+  expect_identical(res$haystack, c(rep(NA, 3), 2L))
 })

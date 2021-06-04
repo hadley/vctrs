@@ -31,6 +31,9 @@ struct vctrs_no_match {
   int value;
 };
 
+#define SIGNAL_NO_MATCH r_globals.na_int
+#define SIGNAL_NA_PROPAGATE -1
+
 // -----------------------------------------------------------------------------
 
 #include "decl/matches-decl.h"
@@ -237,7 +240,7 @@ r_obj* df_matches(r_obj* needles,
 
     for (r_ssize i = 0; i < size_needles; ++i) {
       // Initialize to no match everywhere, no need to initialize extra buffer
-      v_o_haystack_starts[i] = r_globals.na_int;
+      v_o_haystack_starts[i] = SIGNAL_NO_MATCH;
       v_match_sizes[i] = 1;
       v_needles_locs[i] = i + 1;
     }
@@ -343,6 +346,7 @@ r_obj* df_matches(r_obj* needles,
     p_o_haystack_starts,
     p_match_sizes,
     p_needles_locs,
+    na_equal,
     no_match,
     any_multiple
   ), &n_prot);
@@ -406,6 +410,13 @@ void df_matches_recurse(r_ssize col,
 
   if (!na_equal && needle_is_missing) {
     // Propagate NA, don't recursive into further columns.
+    for (r_ssize i = grp_lower_o_needles; i <= grp_upper_o_needles; ++i) {
+      // Will always be the first and only time the output is touched for this
+      // needle, so we can poke directly into it
+      const int loc = v_o_needles[i] - 1;
+      R_ARR_POKE(int, p_o_haystack_starts, loc, SIGNAL_NA_PROPAGATE);
+    }
+
     // Learned nothing about haystack!
     bool do_lhs = grp_lower_o_needles > lower_o_needles;
     bool do_rhs = grp_upper_o_needles < upper_o_needles;
@@ -1080,7 +1091,7 @@ struct vctrs_no_match parse_no_match(r_obj* no_match) {
     const char* c_no_match = r_chr_get_c_string(no_match, 0);
 
     if (!strcmp(c_no_match, "error")) {
-      return (struct vctrs_no_match) {true, -1};
+      return (struct vctrs_no_match) {true, SIGNAL_NO_MATCH};
     }
   }
 
@@ -1116,6 +1127,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
+                              bool na_equal,
                               const struct vctrs_no_match* no_match,
                               bool any_multiple) {
   const r_ssize n_used = p_o_haystack_starts->count;
@@ -1157,7 +1169,21 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     const int match_size = v_match_sizes[loc];
     const int needles_loc = v_needles_locs[loc];
 
-    if (int_is_missing(o_haystack_loc)) {
+    if (!na_equal && o_haystack_loc == SIGNAL_NA_PROPAGATE) {
+      if (match_size != 1) {
+        r_stop_internal(
+          "expand_compact_indices",
+          "`match_size` should always be 1 in the case of NA propagation."
+        );
+      }
+
+      v_out_needles[out_loc] = needles_loc;
+      v_out_haystack[out_loc] = r_globals.na_int;
+      ++out_loc;
+      continue;
+    }
+
+    if (o_haystack_loc == SIGNAL_NO_MATCH) {
       if (match_size != 1) {
         r_stop_internal(
           "expand_compact_indices",
@@ -1175,7 +1201,6 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
       v_out_needles[out_loc] = needles_loc;
       v_out_haystack[out_loc] = no_match->value;
       ++out_loc;
-
       continue;
     }
 
@@ -1534,3 +1559,7 @@ r_ssize midpoint(r_ssize lhs, r_ssize rhs) {
   return lhs + (rhs - lhs) / 2;
 }
 
+// -----------------------------------------------------------------------------
+
+#undef SIGNAL_NO_MATCH
+#undef SIGNAL_NA_PROPAGATE
