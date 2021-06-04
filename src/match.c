@@ -222,31 +222,45 @@ r_obj* df_matches(r_obj* needles,
   struct r_dyn_array* p_o_haystack_starts = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
   KEEP_N(p_o_haystack_starts->shelter, &n_prot);
 
-  // TODO: `match_sizes` and `needles_locs` aren't needed if `multiple %in% c("last", "first")`
-  // Size is always 1, and location is increasing sequence of locations.
-  struct r_dyn_array* p_match_sizes = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
-  KEEP_N(p_match_sizes->shelter, &n_prot);
+  {
+    // Temporary unstable pointer
+    int* v_o_haystack_starts = (int*) r_arr_begin(p_o_haystack_starts);
+    for (r_ssize i = 0; i < size_needles; ++i) {
+      // Initialize to no match everywhere, no need to initialize extra buffer
+      v_o_haystack_starts[i] = SIGNAL_NO_MATCH;
+    }
+    p_o_haystack_starts->count = size_needles;
+  }
 
+  // If we can skip, `match_sizes` will always be `1`
+  const bool skip_match_sizes = (multiple == VCTRS_MULTIPLE_first || multiple == VCTRS_MULTIPLE_last);
+
+  struct r_dyn_array* p_match_sizes = NULL;
+  if (!skip_match_sizes) {
+    p_match_sizes = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
+    KEEP_N(p_match_sizes->shelter, &n_prot);
+
+    int* v_match_sizes = (int*) r_arr_begin(p_match_sizes);
+    for (r_ssize i = 0; i < size_needles; ++i) {
+      // No need to initialize extra buffer
+      v_match_sizes[i] = 1;
+    }
+    p_match_sizes->count = size_needles;
+  }
+
+  // TODO: `needles_locs` isn't needed if `multiple %in% c("last", "first")`
   // TODO: Also don't need `needles_locs` when `n_nested_groups == 1` (even if multiple="all"),
   // as this implies that there is no nested and the locations are again an ordered sequence.
   struct r_dyn_array* p_needles_locs = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
   KEEP_N(p_needles_locs->shelter, &n_prot);
 
   {
-    // Temporary unstable pointers
-    int* v_o_haystack_starts = (int*) r_arr_begin(p_o_haystack_starts);
-    int* v_match_sizes = (int*) r_arr_begin(p_match_sizes);
+    // Temporary unstable pointer
     int* v_needles_locs = (int*) r_arr_begin(p_needles_locs);
-
     for (r_ssize i = 0; i < size_needles; ++i) {
-      // Initialize to no match everywhere, no need to initialize extra buffer
-      v_o_haystack_starts[i] = SIGNAL_NO_MATCH;
-      v_match_sizes[i] = 1;
+      // No need to initialize extra buffer
       v_needles_locs[i] = i + 1;
     }
-
-    p_o_haystack_starts->count = size_needles;
-    p_match_sizes->count = size_needles;
     p_needles_locs->count = size_needles;
   }
 
@@ -346,6 +360,7 @@ r_obj* df_matches(r_obj* needles,
     p_o_haystack_starts,
     p_match_sizes,
     p_needles_locs,
+    skip_match_sizes,
     na_equal,
     no_match,
     any_multiple
@@ -1127,20 +1142,25 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
+                              bool skip_match_sizes,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
                               bool any_multiple) {
   const r_ssize n_used = p_o_haystack_starts->count;
 
   const int* v_o_haystack_starts = (const int*) r_arr_cbegin(p_o_haystack_starts);
-  const int* v_match_sizes = (const int*) r_arr_cbegin(p_match_sizes);
+  const int* v_match_sizes = skip_match_sizes ? NULL : (const int*) r_arr_cbegin(p_match_sizes);
   const int* v_needles_locs = (const int*) r_arr_cbegin(p_needles_locs);
 
   r_ssize out_size = 0;
-  for (r_ssize i = 0; i < n_used; ++i) {
-    // TODO: Check for overflow?
-    // This could get extremely large with improperly specified non-equi joins.
-    out_size += (r_ssize) v_match_sizes[i];
+  if (skip_match_sizes) {
+    out_size = n_used;
+  } else {
+    for (r_ssize i = 0; i < n_used; ++i) {
+      // TODO: Check for overflow?
+      // This could get extremely large with improperly specified non-equi joins.
+      out_size += (r_ssize) v_match_sizes[i];
+    }
   }
 
   r_obj* names = KEEP(r_chr_n(v_matches_df_names_c_strings, MATCHES_DF_SIZE));
@@ -1166,7 +1186,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     const int loc = v_o_needles_locs[i] - 1;
 
     int o_haystack_loc = v_o_haystack_starts[loc];
-    const int match_size = v_match_sizes[loc];
+    const int match_size = skip_match_sizes ? 1 : v_match_sizes[loc];
     const int needles_loc = v_needles_locs[loc];
 
     if (!na_equal && o_haystack_loc == SIGNAL_NA_PROPAGATE) {
