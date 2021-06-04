@@ -465,3 +465,17 @@ test_that("can control `no_match`", {
   x <- vec_matches(1:3, 1L, no_match = 0L)
   expect_identical(x$haystack, c(1L, 0L, 0L))
 })
+
+test_that("`no_match` can error", {
+  expect_error(
+    vec_matches(1, 2, no_match = "error"),
+    "no matches"
+  )
+})
+
+test_that("`no_match = 'error'` errors on propagated NAs", {
+  expect_error(
+    vec_matches(NA, NA, na_equal = FALSE, no_match = "error"),
+    "no matches"
+  )
+})

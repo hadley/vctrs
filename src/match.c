@@ -26,6 +26,11 @@ enum vctrs_ops {
   VCTRS_OPS_lte = 4
 };
 
+struct vctrs_no_match {
+  bool error;
+  int value;
+};
+
 // -----------------------------------------------------------------------------
 
 #include "decl/matches-decl.h"
@@ -45,10 +50,7 @@ r_obj* vctrs_matches(r_obj* needles,
                      r_obj* haystack_arg) {
   bool c_na_equal = r_as_bool(na_equal);
 
-  if (r_typeof(no_match) != R_TYPE_integer || r_length(no_match) != 1) {
-    r_abort("`no_match` must be an integer of length 1.");
-  }
-  int c_no_match = r_int_get(no_match, 0);
+  const struct vctrs_no_match c_no_match = parse_no_match(no_match);
 
   if (!r_is_bool(nan_distinct)) {
     r_abort("`nan_distinct` must be a single `TRUE` or `FALSE`.");
@@ -65,7 +67,7 @@ r_obj* vctrs_matches(r_obj* needles,
     haystack,
     condition,
     c_na_equal,
-    c_no_match,
+    &c_no_match,
     c_multiple,
     c_nan_distinct,
     chr_transform,
@@ -79,7 +81,7 @@ r_obj* vec_matches(r_obj* needles,
                    r_obj* haystack,
                    r_obj* condition,
                    bool na_equal,
-                   int no_match,
+                   const struct vctrs_no_match* no_match,
                    enum vctrs_multiple multiple,
                    bool nan_distinct,
                    r_obj* chr_transform,
@@ -190,7 +192,7 @@ r_obj* df_matches(r_obj* needles,
                   r_ssize size_needles,
                   r_ssize size_haystack,
                   bool na_equal,
-                  int no_match,
+                  const struct vctrs_no_match* no_match,
                   enum vctrs_multiple multiple,
                   enum vctrs_ops* v_ops) {
   int n_prot = 0;
@@ -1069,6 +1071,26 @@ enum vctrs_multiple parse_multiple(r_obj* multiple) {
 
 // -----------------------------------------------------------------------------
 
+static inline
+struct vctrs_no_match parse_no_match(r_obj* no_match) {
+  if (r_is_string(no_match)) {
+    const char* c_no_match = r_chr_get_c_string(no_match, 0);
+
+    if (!strcmp(c_no_match, "error")) {
+      return (struct vctrs_no_match) {true, -1};
+    }
+  }
+
+  if (r_typeof(no_match) == R_TYPE_integer && r_length(no_match) == 1) {
+    int c_no_match = r_int_get(no_match, 0);
+    return (struct vctrs_no_match) {false, c_no_match};
+  }
+
+  r_abort("`no_match` must be a length 1 integer, or \"error\".");
+}
+
+// -----------------------------------------------------------------------------
+
 static
 const char* v_matches_df_names_c_strings[] = {
   "needles",
@@ -1091,7 +1113,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
-                              int no_match,
+                              const struct vctrs_no_match* no_match,
                               bool any_multiple) {
   const r_ssize n_used = p_o_haystack_starts->count;
 
@@ -1140,8 +1162,15 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
         );
       }
 
+      if (no_match->error) {
+        r_abort(
+          "Oh no! There were no matches for the `needle` at location %i.",
+          (int) i + 1
+        );
+      }
+
       v_out_needles[out_loc] = needles_loc;
-      v_out_haystack[out_loc] = no_match;
+      v_out_haystack[out_loc] = no_match->value;
       ++out_loc;
 
       continue;

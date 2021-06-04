@@ -3,7 +3,7 @@ r_obj* vec_matches(r_obj* needles,
                    r_obj* haystack,
                    r_obj* condition,
                    bool na_equal,
-                   int no_match,
+                   const struct vctrs_no_match* no_match,
                    enum vctrs_multiple multiple,
                    bool nan_distinct,
                    r_obj* chr_transform,
@@ -18,7 +18,7 @@ r_obj* df_matches(r_obj* needles,
                   r_ssize size_needles,
                   r_ssize size_haystack,
                   bool na_equal,
-                  int no_match,
+                  const struct vctrs_no_match* no_match,
                   enum vctrs_multiple multiple,
                   enum vctrs_ops* v_ops);
 
@@ -101,6 +101,9 @@ static inline
 void parse_condition(r_obj* condition, enum vctrs_ops* v_ops, r_ssize n_cols);
 
 static inline
+struct vctrs_no_match parse_no_match(r_obj* no_match);
+
+static inline
 enum vctrs_multiple parse_multiple(r_obj* multiple);
 
 static
@@ -108,7 +111,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
-                              int no_match,
+                              const struct vctrs_no_match* no_match,
                               bool any_multiple);
 
 static
