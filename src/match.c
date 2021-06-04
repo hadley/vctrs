@@ -195,13 +195,7 @@ r_obj* df_matches(r_obj* needles,
                   enum vctrs_ops* v_ops) {
   int n_prot = 0;
 
-  // `vec_order()` setup
-  r_obj* const direction = KEEP_N(r_chr("asc"), &n_prot);
-  r_obj* const na_value = KEEP_N(r_chr("smallest"), &n_prot);
-  const bool nan_distinct = true;
-  r_obj* const chr_transform = r_null;
-
-  r_obj* o_needles = KEEP_N(vec_order(needles, direction, na_value, nan_distinct, chr_transform), &n_prot);
+  r_obj* o_needles = KEEP_N(vec_order(needles, chrs_asc, chrs_smallest, true, r_null), &n_prot);
   const int* v_o_needles = r_int_cbegin(o_needles);
 
   r_obj* info = KEEP_N(compute_nested_containment_info(haystack, v_ops), &n_prot);
@@ -949,10 +943,6 @@ r_obj* df_joint_ranks(r_obj* x,
 
   r_obj* c_args = KEEP(r_alloc_list(2));
 
-  // vec_rank() setup
-  r_obj* const direction = KEEP(r_chr("asc"));
-  r_obj* const na_value = KEEP(r_chr("smallest"));
-
   for (r_ssize i = 0; i < n_cols; ++i) {
     r_obj* x_elt = v_x[i];
     r_obj* y_elt = v_y[i];
@@ -969,8 +959,8 @@ r_obj* df_joint_ranks(r_obj* x,
       both,
       TIES_dense,
       na_propagate,
-      direction,
-      na_value,
+      chrs_asc,
+      chrs_smallest,
       nan_distinct,
       chr_transform
     ));
@@ -982,7 +972,7 @@ r_obj* df_joint_ranks(r_obj* x,
     FREE(2);
   }
 
-  FREE(7);
+  FREE(5);
   return out;
 }
 
@@ -1129,14 +1119,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
   int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
   int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
 
-  // `vec_order()` setup
-  r_obj* const direction = KEEP(r_chr("asc"));
-  r_obj* const na_value = KEEP(r_chr("smallest"));
-  const bool nan_distinct = true;
-  r_obj* const chr_transform = r_null;
-
   r_obj* needles_locs = KEEP(r_arr_unwrap(p_needles_locs));
-  r_obj* o_needles_locs = KEEP(vec_order(needles_locs, direction, na_value, nan_distinct, chr_transform));
+  r_obj* o_needles_locs = KEEP(vec_order(needles_locs, chrs_asc, chrs_smallest, true, r_null));
   const int* v_o_needles_locs = r_int_cbegin(o_needles_locs);
 
   r_ssize out_loc = 0;
@@ -1179,7 +1163,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
   // Currently, the needles columns is correct, but within each needles group
   // the haystack column is ordered naturally rather than by first appearance.
   if (any_multiple) {
-    r_obj* o_haystack_appearance = KEEP(vec_order(out, direction, na_value, nan_distinct, chr_transform));
+    r_obj* o_haystack_appearance = KEEP(vec_order(out, chrs_asc, chrs_smallest, true, r_null));
     const int* v_o_haystack_appearance = r_int_cbegin(o_haystack_appearance);
 
     r_obj* out_haystack2 = KEEP(r_alloc_integer(out_size));
@@ -1193,7 +1177,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     FREE(2);
   }
 
-  FREE(6);
+  FREE(4);
   return out;
 }
 
@@ -1213,13 +1197,6 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
 
   r_ssize n_cols = r_length(haystack);
   r_ssize size_haystack = vec_size(haystack);
-
-  // `vec_order()` setup
-  r_obj* const direction = KEEP_N(r_chr("asc"), &n_prot);
-  r_obj* const na_value = KEEP_N(r_chr("smallest"), &n_prot);
-  const bool nan_distinct = true;
-  r_obj* const chr_transform = r_null;
-  const bool chr_ordered = true;
 
   // Haystack order, nested groups, and number of nested groups
   r_obj* out = KEEP_N(r_alloc_list(3), &n_prot);
@@ -1242,7 +1219,7 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
   if (!any_nesting) {
     // Nested group info isn't required for only `==`, or when
     // there is only 1 column after the last non-directional column
-    r_list_poke(out, 0, vec_order(haystack, direction, na_value, nan_distinct, chr_transform));
+    r_list_poke(out, 0, vec_order(haystack, chrs_asc, chrs_smallest, true, r_null));
     r_list_poke(out, 1, vctrs_shared_empty_int);
     r_list_poke(out, 2, r_int(1));
     FREE(n_prot);
@@ -1251,11 +1228,11 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
 
   r_obj* info = KEEP_N(vec_order_info(
     haystack,
-    direction,
-    na_value,
-    nan_distinct,
-    chr_transform,
-    chr_ordered
+    chrs_asc,
+    chrs_smallest,
+    true,
+    r_null,
+    true
   ), &n_prot);
 
   r_obj* o_haystack = r_list_get(info, 0);
@@ -1302,11 +1279,11 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
 
     r_obj* info = vec_order_info(
       haystack_outer,
-      direction,
-      na_value,
-      nan_distinct,
-      chr_transform,
-      chr_ordered
+      chrs_asc,
+      chrs_smallest,
+      true,
+      r_null,
+      true
     );
     outer_run_sizes = r_list_get(info, 1);
     KEEP_AT(outer_run_sizes, outer_run_sizes_pi);
@@ -1354,10 +1331,10 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
 
   o_haystack = KEEP_N(vec_order(
     haystack_with_nesting,
-    direction,
-    na_value,
-    nan_distinct,
-    chr_transform
+    chrs_asc,
+    chrs_smallest,
+    true,
+    r_null
   ), &n_prot);
 
   r_list_poke(out, 0, o_haystack);
