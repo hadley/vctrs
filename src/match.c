@@ -248,14 +248,16 @@ r_obj* df_matches(r_obj* needles,
     p_match_sizes->count = size_needles;
   }
 
-  // TODO: `needles_locs` isn't needed if `multiple %in% c("last", "first")`
+  // If we can skip, `needles_locs` will always be an increasing sequence of values
+  const bool skip_needles_locs = (multiple == VCTRS_MULTIPLE_first || multiple == VCTRS_MULTIPLE_last);
+
   // TODO: Also don't need `needles_locs` when `n_nested_groups == 1` (even if multiple="all"),
   // as this implies that there is no nested and the locations are again an ordered sequence.
-  struct r_dyn_array* p_needles_locs = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
-  KEEP_N(p_needles_locs->shelter, &n_prot);
+  struct r_dyn_array* p_needles_locs;
+  if (!skip_needles_locs) {
+    p_needles_locs = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
+    KEEP_N(p_needles_locs->shelter, &n_prot);
 
-  {
-    // Temporary unstable pointer
     int* v_needles_locs = (int*) r_arr_begin(p_needles_locs);
     for (r_ssize i = 0; i < size_needles; ++i) {
       // No need to initialize extra buffer
@@ -361,6 +363,7 @@ r_obj* df_matches(r_obj* needles,
     p_match_sizes,
     p_needles_locs,
     skip_match_sizes,
+    skip_needles_locs,
     na_equal,
     no_match,
     any_multiple
@@ -1143,6 +1146,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_match_sizes,
                               struct r_dyn_array* p_needles_locs,
                               bool skip_match_sizes,
+                              bool skip_needles_locs,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
                               bool any_multiple) {
@@ -1150,7 +1154,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 
   const int* v_o_haystack_starts = (const int*) r_arr_cbegin(p_o_haystack_starts);
   const int* v_match_sizes = skip_match_sizes ? NULL : (const int*) r_arr_cbegin(p_match_sizes);
-  const int* v_needles_locs = (const int*) r_arr_cbegin(p_needles_locs);
+  const int* v_needles_locs = skip_needles_locs ? NULL : (const int*) r_arr_cbegin(p_needles_locs);
 
   r_ssize out_size = 0;
   if (skip_match_sizes) {
@@ -1176,18 +1180,23 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
   int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
   int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
 
-  r_obj* needles_locs = KEEP(r_arr_unwrap(p_needles_locs));
-  r_obj* o_needles_locs = KEEP(vec_order(needles_locs, chrs_asc, chrs_smallest, true, r_null));
+  r_obj* o_needles_locs = vctrs_shared_empty_int;
+  if (!skip_needles_locs) {
+    r_obj* needles_locs = KEEP(r_arr_unwrap(p_needles_locs));
+    o_needles_locs = vec_order(needles_locs, chrs_asc, chrs_smallest, true, r_null);
+    FREE(1);
+  }
+  KEEP(o_needles_locs);
   const int* v_o_needles_locs = r_int_cbegin(o_needles_locs);
 
   r_ssize out_loc = 0;
 
   for (r_ssize i = 0; i < n_used; ++i) {
-    const int loc = v_o_needles_locs[i] - 1;
+    const int loc = skip_needles_locs ? i : v_o_needles_locs[i] - 1;
 
     int o_haystack_loc = v_o_haystack_starts[loc];
     const int match_size = skip_match_sizes ? 1 : v_match_sizes[loc];
-    const int needles_loc = v_needles_locs[loc];
+    const int needles_loc = skip_needles_locs ? loc + 1 : v_needles_locs[loc];
 
     if (!na_equal && o_haystack_loc == SIGNAL_NA_PROPAGATE) {
       if (match_size != 1) {
@@ -1254,7 +1263,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     FREE(2);
   }
 
-  FREE(4);
+  FREE(3);
   return out;
 }
 
