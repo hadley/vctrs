@@ -455,6 +455,16 @@ test_that("can warn on `multiple` matches (with fallback to all)", {
   )
 })
 
+test_that("errors on multiple matches that come from different nested containment groups", {
+  df <- data_frame(x = 0, y = 0)
+  df2 <- data_frame(x = 1:2, y = 2:1)
+
+  expect_error(
+    vec_matches(df, df2, condition = c("<=", "<="), multiple = "error"),
+    "multiple matches"
+  )
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - `no_match`
 

@@ -632,15 +632,18 @@ void df_matches_recurse(r_ssize col,
           const int elt_match_sizes = grp_upper_o_haystack - grp_lower_o_haystack + 1;
           const int elt_needles_locs = loc + 1;
 
-          if (elt_match_sizes > 1) {
-            *p_any_multiple = true;
-          }
-
           if (first_touch) {
+            if (elt_match_sizes > 1) {
+              *p_any_multiple = true;
+            }
+
             R_ARR_POKE(int, p_o_haystack_starts, loc, elt_o_haystack_starts);
             R_ARR_POKE(int, p_match_sizes, loc, elt_match_sizes);
             continue;
           }
+
+          // At a minimum, this is the second match
+          *p_any_multiple = true;
 
           r_arr_push_back(p_o_haystack_starts, &elt_o_haystack_starts);
           r_arr_push_back(p_match_sizes, &elt_match_sizes);
