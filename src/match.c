@@ -20,11 +20,10 @@ enum vctrs_multiple {
 
 enum vctrs_ops {
   VCTRS_OPS_eq = 0,
-  VCTRS_OPS_neq = 1,
-  VCTRS_OPS_gt = 2,
-  VCTRS_OPS_gte = 3,
-  VCTRS_OPS_lt = 4,
-  VCTRS_OPS_lte = 5
+  VCTRS_OPS_gt = 1,
+  VCTRS_OPS_gte = 2,
+  VCTRS_OPS_lt = 3,
+  VCTRS_OPS_lte = 4
 };
 
 // -----------------------------------------------------------------------------
@@ -506,7 +505,6 @@ void df_matches_recurse(r_ssize col,
 
   // Adjust bounds based on non-equi condition.
   // If needle is NA, never extend the bounds to capture values past it.
-  // TODO: Handle !=
   switch (op) {
   case VCTRS_OPS_lt: {
     // Exclude found needle
@@ -536,8 +534,9 @@ void df_matches_recurse(r_ssize col,
     }
     break;
   }
-  case VCTRS_OPS_eq: break;
-  case VCTRS_OPS_neq: r_abort("not yet implemented");
+  case VCTRS_OPS_eq: {
+    break;
+  }
   }
 
   if (!needle_is_missing && (op == VCTRS_OPS_gt || op == VCTRS_OPS_gte)) {
@@ -688,9 +687,6 @@ void df_matches_recurse(r_ssize col,
     }
 
     break;
-  }
-  case VCTRS_OPS_neq: {
-    r_abort("not yet implemented");
   }
   case VCTRS_OPS_lt:
   case VCTRS_OPS_lte:
@@ -1026,13 +1022,12 @@ r_obj* df_missings_by_col(r_obj* x, r_ssize x_size, r_ssize n_cols) {
 static inline
 enum vctrs_ops parse_condition_one(const char* condition) {
   if (!strcmp(condition, "==")) { return VCTRS_OPS_eq; }
-  if (!strcmp(condition, "!=")) { return VCTRS_OPS_neq; }
   if (!strcmp(condition, ">"))  { return VCTRS_OPS_gt; }
   if (!strcmp(condition, ">=")) { return VCTRS_OPS_gte; }
   if (!strcmp(condition, "<"))  { return VCTRS_OPS_lt; }
   if (!strcmp(condition, "<=")) { return VCTRS_OPS_lte; }
 
-  r_abort("`condition` must only contain \"==\", \"!=\", \">\", \">=\", \"<\", or \"<=\".");
+  r_abort("`condition` must only contain \"==\", \">\", \">=\", \"<\", or \"<=\".");
 }
 
 static inline
@@ -1234,7 +1229,7 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
   int first_directional = 0;
   for (r_ssize i = 0; i < n_cols; ++i) {
     enum vctrs_ops op = v_ops[i];
-    if (op == VCTRS_OPS_eq || op == VCTRS_OPS_neq) {
+    if (op == VCTRS_OPS_eq) {
       continue;
     }
     any_directional = true;
