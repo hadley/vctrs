@@ -411,6 +411,12 @@ test_that("multiple matches from a non-equi condition are returned in first appe
 
   expect_identical(res$needles, rep(1L, 3))
   expect_identical(res$haystack, c(1L, 2L, 4L))
+
+  # Checking equi for good measure
+  res <- vec_matches(0L, c(1L, 0L, -1L, 0L), condition = "==")
+
+  expect_identical(res$needles, rep(1L, 2))
+  expect_identical(res$haystack, c(2L, 4L))
 })
 
 test_that("multiple matches from a non-equi condition are returned in first appearance order when the matches are in different nested groups", {

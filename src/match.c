@@ -214,6 +214,7 @@ r_obj* df_matches(r_obj* needles,
   const int* v_nested_groups = r_int_cbegin(nested_groups);
 
   int n_nested_groups = r_as_int(r_list_get(info, 2));
+  bool any_directional = r_as_bool(r_list_get(info, 3));
 
   // In the case of possible multiple matches that fall in separate
   // nested containers, allocate ~20% extra room
@@ -366,7 +367,8 @@ r_obj* df_matches(r_obj* needles,
     skip_needles_locs,
     na_equal,
     no_match,
-    any_multiple
+    any_multiple,
+    any_directional
   ), &n_prot);
 
   FREE(n_prot);
@@ -1149,7 +1151,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               bool skip_needles_locs,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
-                              bool any_multiple) {
+                              bool any_multiple,
+                              bool any_directional) {
   const r_ssize n_used = p_o_haystack_starts->count;
 
   const int* v_o_haystack_starts = (const int*) r_arr_cbegin(p_o_haystack_starts);
@@ -1244,11 +1247,15 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     }
   }
 
-  // If we had multiple matches, we also have to re-order the haystack column
-  // by first appearance within each needle group.
-  // Currently, the needles columns is correct, but within each needles group
-  // the haystack column is ordered naturally rather than by first appearance.
-  if (any_multiple) {
+  if (any_multiple && any_directional) {
+    // If we had multiple matches and we were doing a non-equi join, then
+    // the needles column will be correct, but any group of multiple matches in
+    // the haystack column will be ordered incorrectly within the needle group.
+    // They will be ordered using the order of the original haystack values,
+    // rather than by first appearance. Reordering the entire output data frame
+    // orders them correctly, as within each needle group it will put the
+    // haystack locations in ascending order (i.e. by first appearance).
+    // This is expensive! `out` could have a huge number of matches.
     r_obj* o_haystack_appearance = KEEP(vec_order(out, chrs_asc, chrs_smallest, true, r_null));
     const int* v_o_haystack_appearance = r_int_cbegin(o_haystack_appearance);
 
@@ -1284,8 +1291,8 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
   r_ssize n_cols = r_length(haystack);
   r_ssize size_haystack = vec_size(haystack);
 
-  // Haystack order, nested groups, and number of nested groups
-  r_obj* out = KEEP_N(r_alloc_list(3), &n_prot);
+  // Haystack order, nested groups, number of nested groups, and any directional
+  r_obj* out = KEEP_N(r_alloc_list(4), &n_prot);
 
   // Are there any directional ops (>, >=, <, <=)? And where is the first?
   bool any_directional = false;
@@ -1308,6 +1315,7 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
     r_list_poke(out, 0, vec_order(haystack, chrs_asc, chrs_smallest, true, r_null));
     r_list_poke(out, 1, vctrs_shared_empty_int);
     r_list_poke(out, 2, r_int(1));
+    r_list_poke(out, 3, r_lgl(any_directional));
     FREE(n_prot);
     return out;
   }
@@ -1391,6 +1399,7 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
     r_list_poke(out, 0, o_haystack);
     r_list_poke(out, 1, vctrs_shared_empty_int);
     r_list_poke(out, 2, r_int(1));
+    r_list_poke(out, 3, r_lgl(any_directional));
     FREE(n_prot);
     return out;
   }
@@ -1426,6 +1435,7 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
   r_list_poke(out, 0, o_haystack);
   r_list_poke(out, 1, nested_groups);
   r_list_poke(out, 2, r_int(n_nested_groups));
+  r_list_poke(out, 3, r_lgl(any_directional));
 
   FREE(n_prot);
   return out;

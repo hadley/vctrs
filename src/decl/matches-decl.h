@@ -115,7 +115,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               bool skip_needles_locs,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
-                              bool any_multiple);
+                              bool any_multiple,
+                              bool any_directional);
 
 static
 r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_ops);
