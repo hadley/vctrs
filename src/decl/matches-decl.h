@@ -20,7 +20,9 @@ r_obj* df_matches(r_obj* needles,
                   bool na_equal,
                   const struct vctrs_no_match* no_match,
                   enum vctrs_multiple multiple,
-                  enum vctrs_ops* v_ops);
+                  enum vctrs_ops* v_ops,
+                  struct vctrs_arg* needles_arg,
+                  struct vctrs_arg* haystack_arg);
 
 static
 void df_matches_recurse(r_ssize col,
@@ -41,7 +43,7 @@ void df_matches_recurse(r_ssize col,
                         struct r_dyn_array* p_match_sizes,
                         struct r_dyn_array* p_needles_locs,
                         r_ssize* p_n_extra,
-                        bool* p_any_multiple);
+                        r_ssize* p_which_multiple);
 
 static
 void df_matches_with_nested_groups(r_ssize size_haystack,
@@ -63,7 +65,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    struct r_dyn_array* p_match_sizes,
                                    struct r_dyn_array* p_needles_locs,
                                    r_ssize* p_n_extra,
-                                   bool* p_any_multiple);
+                                   r_ssize* p_which_multiple);
 
 static inline
 r_ssize int_locate_upper_missing(const int* v_haystack_missings,
@@ -110,7 +112,9 @@ static
 r_obj* expand_match_on_nothing(r_ssize size_needles,
                                r_ssize size_haystack,
                                enum vctrs_multiple multiple,
-                               const struct vctrs_no_match* no_match);
+                               const struct vctrs_no_match* no_match,
+                               struct vctrs_arg* needles_arg,
+                               struct vctrs_arg* haystack_arg);
 
 static
 r_obj* expand_compact_indices(const int* v_o_haystack,
@@ -122,7 +126,9 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
                               bool any_multiple,
-                              bool any_directional);
+                              bool any_directional,
+                              struct vctrs_arg* needles_arg,
+                              struct vctrs_arg* haystack_arg);
 
 static
 r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_ops);
@@ -141,3 +147,13 @@ int p_df_nested_containment_compare_ge_na_equal(const void* x,
 
 static inline
 r_ssize midpoint(r_ssize lhs, r_ssize rhs);
+
+static inline
+void stop_matches_nothing(r_ssize i,
+                          struct vctrs_arg* needles_arg,
+                          struct vctrs_arg* haystack_arg);
+
+static inline
+void stop_matches_multiple(r_ssize i,
+                           struct vctrs_arg* needles_arg,
+                           struct vctrs_arg* haystack_arg);

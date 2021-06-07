@@ -1,0 +1,29 @@
+
+default message
+===============
+
+> vec_matches(1L, c(1L, 1L), multiple = "error")
+Error: Each element can match at most 1 observation.
+x The element at location 1 has multiple matches.
+
+
+can control arg names
+=====================
+
+> vec_matches(1L, c(1L, 1L), multiple = "error", needles_arg = "foo")
+Error: Each element of `foo` can match at most 1 observation.
+x The element at location 1 has multiple matches.
+
+> vec_matches(1L, c(1L, 1L), multiple = "error", needles_arg = "foo",
++ haystack_arg = "bar")
+Error: Each element of `foo` can match at most 1 observation from `bar`.
+x The element at location 1 has multiple matches.
+
+
+with `condition = NULL`
+=======================
+
+> vec_matches(1, 1:2, multiple = "error", condition = NULL)
+Error: Each element can match at most 1 observation.
+x The element at location 1 has multiple matches.
+

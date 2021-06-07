@@ -141,7 +141,14 @@ r_obj* vec_matches(r_obj* needles,
   if (condition == r_null) {
     // Special case of "match on nothing" to mimic `LEFT JOIN needles, haystack`
     // with no ON condition
-    r_obj* out = expand_match_on_nothing(size_needles, size_haystack, multiple, no_match);
+    r_obj* out = expand_match_on_nothing(
+      size_needles,
+      size_haystack,
+      multiple,
+      no_match,
+      needles_arg,
+      haystack_arg
+    );
     FREE(n_prot);
     return out;
   }
@@ -192,7 +199,9 @@ r_obj* vec_matches(r_obj* needles,
     na_equal,
     no_match,
     multiple,
-    v_ops
+    v_ops,
+    needles_arg,
+    haystack_arg
   );
 
   FREE(n_prot);
@@ -211,7 +220,9 @@ r_obj* df_matches(r_obj* needles,
                   bool na_equal,
                   const struct vctrs_no_match* no_match,
                   enum vctrs_multiple multiple,
-                  enum vctrs_ops* v_ops) {
+                  enum vctrs_ops* v_ops,
+                  struct vctrs_arg* needles_arg,
+                  struct vctrs_arg* haystack_arg) {
   int n_prot = 0;
 
   r_obj* o_needles = KEEP_N(vec_order(needles, chrs_asc, chrs_smallest, true, r_null), &n_prot);
@@ -268,7 +279,7 @@ r_obj* df_matches(r_obj* needles,
 
   // TODO: Also don't need `needles_locs` when `n_nested_groups == 1` (even if multiple="all"),
   // as this implies that there is no nested and the locations are again an ordered sequence.
-  struct r_dyn_array* p_needles_locs;
+  struct r_dyn_array* p_needles_locs = NULL;
   if (!skip_needles_locs) {
     p_needles_locs = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
     KEEP_N(p_needles_locs->shelter, &n_prot);
@@ -308,7 +319,7 @@ r_obj* df_matches(r_obj* needles,
   }
 
   r_ssize n_extra = 0;
-  bool any_multiple = false;
+  r_ssize which_multiple = -1;
 
   if (size_needles > 0) {
     // Recursion requires at least 1 row in needles.
@@ -342,7 +353,7 @@ r_obj* df_matches(r_obj* needles,
         p_match_sizes,
         p_needles_locs,
         &n_extra,
-        &any_multiple
+        &which_multiple
       );
     } else {
       df_matches_with_nested_groups(
@@ -365,14 +376,16 @@ r_obj* df_matches(r_obj* needles,
         p_match_sizes,
         p_needles_locs,
         &n_extra,
-        &any_multiple
+        &which_multiple
       );
     }
   }
 
+  const bool any_multiple = which_multiple != -1;
+
   if (any_multiple) {
     if (multiple == VCTRS_MULTIPLE_error) {
-      r_abort("Oh no, multiple matches!");
+      stop_matches_multiple(which_multiple, needles_arg, haystack_arg);
     } else if (multiple == VCTRS_MULTIPLE_warning) {
       r_warn("Oh no, multiple matches! (but we are ok with that)");
     }
@@ -388,7 +401,9 @@ r_obj* df_matches(r_obj* needles,
     na_equal,
     no_match,
     any_multiple,
-    any_directional
+    any_directional,
+    needles_arg,
+    haystack_arg
   ), &n_prot);
 
   FREE(n_prot);
@@ -416,7 +431,7 @@ void df_matches_recurse(r_ssize col,
                         struct r_dyn_array* p_match_sizes,
                         struct r_dyn_array* p_needles_locs,
                         r_ssize* p_n_extra,
-                        bool* p_any_multiple) {
+                        r_ssize* p_which_multiple) {
   const enum vctrs_ops op = v_ops[col];
   const r_ssize n_col = p_needles->n_col;
 
@@ -483,7 +498,7 @@ void df_matches_recurse(r_ssize col,
         p_match_sizes,
         p_needles_locs,
         p_n_extra,
-        p_any_multiple
+        p_which_multiple
       );
     }
     if (do_rhs) {
@@ -508,7 +523,7 @@ void df_matches_recurse(r_ssize col,
         p_match_sizes,
         p_needles_locs,
         p_n_extra,
-        p_any_multiple
+        p_which_multiple
       );
     }
 
@@ -631,7 +646,7 @@ void df_matches_recurse(r_ssize col,
         p_match_sizes,
         p_needles_locs,
         p_n_extra,
-        p_any_multiple
+        p_which_multiple
       );
     } else {
       for (r_ssize i = grp_lower_o_needles; i <= grp_upper_o_needles; ++i) {
@@ -685,7 +700,7 @@ void df_matches_recurse(r_ssize col,
 
           if (first_touch) {
             if (elt_match_sizes > 1) {
-              *p_any_multiple = true;
+              *p_which_multiple = loc;
             }
 
             R_ARR_POKE(int, p_o_haystack_starts, loc, elt_o_haystack_starts);
@@ -694,7 +709,7 @@ void df_matches_recurse(r_ssize col,
           }
 
           // At a minimum, this is the second match
-          *p_any_multiple = true;
+          *p_which_multiple = loc;
 
           r_arr_push_back(p_o_haystack_starts, &elt_o_haystack_starts);
           r_arr_push_back(p_match_sizes, &elt_match_sizes);
@@ -797,7 +812,7 @@ void df_matches_recurse(r_ssize col,
       p_match_sizes,
       p_needles_locs,
       p_n_extra,
-      p_any_multiple
+      p_which_multiple
     );
   }
   if (do_rhs) {
@@ -820,7 +835,7 @@ void df_matches_recurse(r_ssize col,
       p_match_sizes,
       p_needles_locs,
       p_n_extra,
-      p_any_multiple
+      p_which_multiple
     );
   }
 }
@@ -847,7 +862,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    struct r_dyn_array* p_match_sizes,
                                    struct r_dyn_array* p_needles_locs,
                                    r_ssize* p_n_extra,
-                                   bool* p_any_multiple) {
+                                   r_ssize* p_which_multiple) {
   const int* v_haystack = v_nested_groups;
 
   r_ssize grp_lower_o_haystack = 0;
@@ -907,7 +922,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
       p_match_sizes,
       p_needles_locs,
       p_n_extra,
-      p_any_multiple
+      p_which_multiple
     );
 
     // Update bounds for next group
@@ -1203,13 +1218,15 @@ static
 r_obj* expand_match_on_nothing(r_ssize size_needles,
                                r_ssize size_haystack,
                                enum vctrs_multiple multiple,
-                               const struct vctrs_no_match* no_match) {
+                               const struct vctrs_no_match* no_match,
+                               struct vctrs_arg* needles_arg,
+                               struct vctrs_arg* haystack_arg) {
   if (size_haystack == 0) {
     // Handle empty `haystack` up front
     // `no_match` everywhere, retaining size of `needles`
 
     if (no_match->error && size_needles > 0) {
-      r_abort("Oh no! There were no matches for the `needle` at location %i.", 1);
+      stop_matches_nothing(0, needles_arg, haystack_arg);
     }
 
     r_obj* out = KEEP(new_vec_matches_result(size_needles));
@@ -1250,7 +1267,7 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
 
   if (size_haystack > 1 && size_needles > 0) {
     if (multiple == VCTRS_MULTIPLE_error) {
-      r_abort("Oh no, multiple matches!");
+      stop_matches_multiple(0, needles_arg, haystack_arg);
     } else if (multiple == VCTRS_MULTIPLE_warning) {
       r_warn("Oh no, multiple matches! (but we are ok with that)");
     }
@@ -1287,7 +1304,9 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
                               bool any_multiple,
-                              bool any_directional) {
+                              bool any_directional,
+                              struct vctrs_arg* needles_arg,
+                              struct vctrs_arg* haystack_arg) {
   const r_ssize n_used = p_o_haystack_starts->count;
 
   const int* v_o_haystack_starts = (const int*) r_arr_cbegin(p_o_haystack_starts);
@@ -1351,10 +1370,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
       }
 
       if (no_match->error) {
-        r_abort(
-          "Oh no! There were no matches for the `needle` at location %i.",
-          (int) i + 1
-        );
+        stop_matches_nothing(i, needles_arg, haystack_arg);
       }
 
       v_out_needles[out_loc] = needles_loc;
@@ -1723,6 +1739,54 @@ int p_df_nested_containment_compare_ge_na_equal(const void* x,
 static inline
 r_ssize midpoint(r_ssize lhs, r_ssize rhs) {
   return lhs + (rhs - lhs) / 2;
+}
+
+// -----------------------------------------------------------------------------
+
+static inline
+void stop_matches_nothing(r_ssize i,
+                          struct vctrs_arg* needles_arg,
+                          struct vctrs_arg* haystack_arg) {
+  r_obj* syms[4] = {
+    syms_i,
+    syms_needles_arg,
+    syms_haystack_arg,
+    NULL
+  };
+  r_obj* args[4] = {
+    KEEP(r_int((int)i + 1)),
+    KEEP(vctrs_arg(needles_arg)),
+    KEEP(vctrs_arg(haystack_arg)),
+    NULL
+  };
+
+  r_obj* call = KEEP(r_call_n(syms_stop_matches_nothing, syms, args));
+  Rf_eval(call, vctrs_ns_env);
+
+  never_reached("stop_matches_nothing");
+}
+
+static inline
+void stop_matches_multiple(r_ssize i,
+                           struct vctrs_arg* needles_arg,
+                           struct vctrs_arg* haystack_arg) {
+  r_obj* syms[4] = {
+    syms_i,
+    syms_needles_arg,
+    syms_haystack_arg,
+    NULL
+  };
+  r_obj* args[4] = {
+    KEEP(r_int((int)i + 1)),
+    KEEP(vctrs_arg(needles_arg)),
+    KEEP(vctrs_arg(haystack_arg)),
+    NULL
+  };
+
+  r_obj* call = KEEP(r_call_n(syms_stop_matches_multiple, syms, args));
+  Rf_eval(call, vctrs_ns_env);
+
+  never_reached("stop_matches_multiple");
 }
 
 // -----------------------------------------------------------------------------

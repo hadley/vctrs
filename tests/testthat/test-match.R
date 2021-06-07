@@ -477,11 +477,18 @@ test_that("duplicate needles match the same haystack locations", {
   expect_identical(x$haystack, c(1L, 3L, 2L, 1L, 3L, 2L))
 })
 
-test_that("can error on `multiple` matches", {
-  expect_error(
-    vec_matches(c(1L, 3L, 1L, 3L), c(1L, 3L, 1L), multiple = "error"),
-    "multiple matches"
-  )
+test_that("`multiple` can error informatively", {
+  verify_output(test_path("error", "test-matches-multiple.txt"), {
+    "# default message"
+    vec_matches(1L, c(1L, 1L), multiple = "error")
+
+    "# can control arg names"
+    vec_matches(1L, c(1L, 1L), multiple = "error", needles_arg = "foo")
+    vec_matches(1L, c(1L, 1L), multiple = "error", needles_arg = "foo", haystack_arg = "bar")
+
+    "# with `condition = NULL`"
+    vec_matches(1, 1:2, multiple = "error", condition = NULL)
+  })
 })
 
 test_that("can warn on `multiple` matches (with fallback to all)", {
@@ -522,11 +529,18 @@ test_that("can differentiate between `no_match` and propagated NAs", {
   expect_identical(res$haystack, c(-1L, NA))
 })
 
-test_that("`no_match` can error", {
-  expect_error(
-    vec_matches(1, 2, no_match = "error"),
-    "no matches"
-  )
+test_that("`no_match` can error informatively", {
+  verify_output(test_path("error", "test-matches-nothing.txt"), {
+    "# default message"
+    vec_matches(1, 2, no_match = "error")
+
+    "# can control arg names"
+    vec_matches(1, 2, no_match = "error", needles_arg = "foo")
+    vec_matches(1, 2, no_match = "error", needles_arg = "foo", haystack_arg = "bar")
+
+    "# with `condition = NULL`"
+    vec_matches(1, double(), no_match = "error", condition = NULL)
+  })
 })
 
 test_that("`no_match = 'error'` passes propagated NAs through untouched", {
@@ -627,8 +641,8 @@ test_that("`condition = NULL` is correct in all possible cases", {
   for (multiple in multiples) {
     # `zero` haystack with `no_match = "error"`
     expect_identical(matches(zero, zero, multiple = multiple, no_match = "error"), exp(integer(), integer()))
-    expect_error(matches(one, zero, multiple = multiple, no_match = "error"), "no matches")
-    expect_error(matches(two, zero, multiple = multiple, no_match = "error"), "no matches")
+    expect_error(matches(one, zero, multiple = multiple, no_match = "error"), "must have a match")
+    expect_error(matches(two, zero, multiple = multiple, no_match = "error"), "must have a match")
   }
 })
 
