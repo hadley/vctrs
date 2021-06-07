@@ -310,58 +310,64 @@ r_obj* df_matches(r_obj* needles,
   r_ssize n_extra = 0;
   bool any_multiple = false;
 
-  const r_ssize col = 0;
-  const r_ssize lower_o_needles = 0;
-  const r_ssize upper_o_needles = size_needles - 1;
+  if (size_needles > 0) {
+    // Recursion requires at least 1 row in needles.
+    // In the case of size 0 needles, there is nothing to do, but this avoids
+    // a segfault.
 
-  if (n_nested_groups == 1) {
-    const r_ssize lower_o_haystack = 0;
-    const r_ssize upper_o_haystack = size_haystack - 1;
+    const r_ssize col = 0;
+    const r_ssize lower_o_needles = 0;
+    const r_ssize upper_o_needles = size_needles - 1;
 
-    df_matches_recurse(
-      col,
-      lower_o_needles,
-      upper_o_needles,
-      lower_o_haystack,
-      upper_o_haystack,
-      p_needles,
-      p_haystack,
-      p_needles_missings,
-      p_haystack_missings,
-      v_o_needles,
-      v_o_haystack,
-      na_equal,
-      multiple,
-      v_ops,
-      p_o_haystack_starts,
-      p_match_sizes,
-      p_needles_locs,
-      &n_extra,
-      &any_multiple
-    );
-  } else {
-    df_matches_with_nested_groups(
-      size_haystack,
-      n_nested_groups,
-      v_nested_groups,
-      col,
-      lower_o_needles,
-      upper_o_needles,
-      p_needles,
-      p_haystack,
-      p_needles_missings,
-      p_haystack_missings,
-      v_o_needles,
-      v_o_haystack,
-      na_equal,
-      multiple,
-      v_ops,
-      p_o_haystack_starts,
-      p_match_sizes,
-      p_needles_locs,
-      &n_extra,
-      &any_multiple
-    );
+    if (n_nested_groups == 1) {
+      const r_ssize lower_o_haystack = 0;
+      const r_ssize upper_o_haystack = size_haystack - 1;
+
+      df_matches_recurse(
+        col,
+        lower_o_needles,
+        upper_o_needles,
+        lower_o_haystack,
+        upper_o_haystack,
+        p_needles,
+        p_haystack,
+        p_needles_missings,
+        p_haystack_missings,
+        v_o_needles,
+        v_o_haystack,
+        na_equal,
+        multiple,
+        v_ops,
+        p_o_haystack_starts,
+        p_match_sizes,
+        p_needles_locs,
+        &n_extra,
+        &any_multiple
+      );
+    } else {
+      df_matches_with_nested_groups(
+        size_haystack,
+        n_nested_groups,
+        v_nested_groups,
+        col,
+        lower_o_needles,
+        upper_o_needles,
+        p_needles,
+        p_haystack,
+        p_needles_missings,
+        p_haystack_missings,
+        v_o_needles,
+        v_o_haystack,
+        na_equal,
+        multiple,
+        v_ops,
+        p_o_haystack_starts,
+        p_match_sizes,
+        p_needles_locs,
+        &n_extra,
+        &any_multiple
+      );
+    }
   }
 
   if (any_multiple) {
@@ -411,11 +417,6 @@ void df_matches_recurse(r_ssize col,
                         struct r_dyn_array* p_needles_locs,
                         r_ssize* p_n_extra,
                         bool* p_any_multiple) {
-  if (lower_o_needles > upper_o_needles) {
-    // Only occurs if there are 0 rows in `needles`. Nothing to do.
-    return;
-  }
-
   const enum vctrs_ops op = v_ops[col];
   const r_ssize n_col = p_needles->n_col;
 
