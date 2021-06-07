@@ -420,6 +420,12 @@ test_that("`na_equal = FALSE` still propagates NAs in future columns when an ear
   expect_identical(res$haystack, c(-1L, NA, NA, 1L))
 })
 
+test_that("`na_equal` is validated", {
+  expect_error(vec_matches(1, 2, na_equal = NA), "`na_equal` must be a single `TRUE` or `FALSE`")
+  expect_error(vec_matches(1, 2, na_equal = c(TRUE, FALSE)), "`na_equal` must be a single `TRUE` or `FALSE`")
+  expect_error(vec_matches(1, 2, na_equal = "x"), "`na_equal` must be a single `TRUE` or `FALSE`")
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - `condition`
 

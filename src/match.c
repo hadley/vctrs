@@ -51,6 +51,9 @@ r_obj* vctrs_matches(r_obj* needles,
                      r_obj* chr_transform,
                      r_obj* needles_arg,
                      r_obj* haystack_arg) {
+  if (!r_is_bool(na_equal)) {
+    r_abort("`na_equal` must be a single `TRUE` or `FALSE`.");
+  }
   bool c_na_equal = r_as_bool(na_equal);
 
   const struct vctrs_no_match c_no_match = parse_no_match(no_match);
