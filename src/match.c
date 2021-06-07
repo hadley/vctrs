@@ -514,13 +514,6 @@ void df_matches_recurse(r_ssize col,
     return;
   }
 
-  if (lower_o_haystack > upper_o_haystack) {
-    // Only occurs when there are 0 rows in the `haystack`.
-    // No matches will be detected, so end early,
-    // but allow potential NA needle propagation to occur.
-    return;
-  }
-
   r_ssize grp_lower_o_haystack = lower_o_haystack;
   r_ssize grp_upper_o_haystack = upper_o_haystack;
 
