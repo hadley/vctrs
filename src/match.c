@@ -705,6 +705,26 @@ void df_matches_recurse(r_ssize col,
         }
       }
     }
+  } else if (!na_equal && col < n_col - 1) {
+    // Miss! This `needles` column group has no matches in the corresponding
+    // `haystack` column. However, we still need to propagate any potential
+    // NAs that might occur in future columns of this `needles` group. If
+    // `val_needles` was an NA, it would have been caught above, so we only
+    // need to look at future columns.
+    for (r_ssize i = grp_lower_o_needles; i <= grp_upper_o_needles; ++i) {
+      const r_ssize loc = v_o_needles[i] - 1;
+
+      for (r_ssize j = col + 1; j < n_col; ++j) {
+        const int* v_future_needles_missings = (const int*) p_needles_missings->col_ptrs[j];
+        const int future_needles_missing = v_future_needles_missings[loc];
+        const bool future_needle_is_missing = int_is_missing(future_needles_missing);
+
+        if (future_needle_is_missing) {
+          R_ARR_POKE(int, p_o_haystack_starts, loc, SIGNAL_NA_PROPAGATE);
+          break;
+        }
+      }
+    }
   }
 
   bool do_lhs;

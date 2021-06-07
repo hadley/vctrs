@@ -403,6 +403,23 @@ test_that("if `na_equal = FALSE`, an NA in any column results in propagation", {
   expect_identical(res$haystack, c(1L, 2L, NA, NA, 1L, 2L, 1L, 2L))
 })
 
+test_that("`na_equal = FALSE` still propagates NAs in future columns when an earlier column has no matches", {
+  df1 <- data_frame(x = c(1, 1, 2, 3), y = c(1, NA, NA, 4))
+  df2 <- data_frame(x = c(1, 3), y = c(1, 5))
+
+  # The 2 in row 3 of df1 has no match, but the NA in the 2nd column still propagates
+  res <- vec_matches(df1, df2, na_equal = FALSE, no_match = -1L)
+
+  expect_identical(res$needles, 1:4)
+  expect_identical(res$haystack, c(1L, NA, NA, -1L))
+
+  # The 1 in row 1 and 2 of df1 have no match, but the NA in row 2 of the 2nd column propagates
+  res <- vec_matches(df1, df2, na_equal = FALSE, no_match = -1L, condition = ">")
+
+  expect_identical(res$needles, 1:4)
+  expect_identical(res$haystack, c(-1L, NA, NA, 1L))
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - `condition`
 
