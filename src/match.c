@@ -138,7 +138,24 @@ r_obj* vec_matches(r_obj* needles,
     r_init_data_frame(ptype, 0);
   }
 
+  if (condition == r_null) {
+    // Special case of "match on nothing" to mimic `LEFT JOIN needles, haystack`
+    // with no ON condition
+    r_obj* out = expand_match_on_nothing(size_needles, size_haystack, multiple, no_match);
+    FREE(n_prot);
+    return out;
+  }
+
   r_ssize n_cols = r_length(needles);
+
+  enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(n_cols, sizeof(enum vctrs_ops));
+  parse_condition(condition, v_ops, n_cols);
+
+  if (n_cols == 0) {
+    // If we have a match `condition`, but there are no columns, this operation
+    // isn't well defined
+    r_abort("Must have at least 1 column to match on unless `condition = NULL`.");
+  }
 
   bool na_propagate = !na_equal;
 
@@ -164,9 +181,6 @@ r_obj* vec_matches(r_obj* needles,
   ), &n_prot);
   needles = r_list_get(args, 0);
   haystack = r_list_get(args, 1);
-
-  enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(n_cols, sizeof(enum vctrs_ops));
-  parse_condition(condition, v_ops, n_cols);
 
   r_obj* out = df_matches(
     needles,
@@ -1071,7 +1085,7 @@ enum vctrs_ops parse_condition_one(const char* condition) {
 static inline
 void parse_condition(r_obj* condition, enum vctrs_ops* v_ops, r_ssize n_cols) {
   if (r_typeof(condition) != R_TYPE_character) {
-    r_abort("`condition` must be a character vector.");
+    r_abort("`condition` must be a character vector, or `NULL`.");
   }
 
   r_obj* const* v_condition = r_chr_cbegin(condition);
@@ -1090,8 +1104,8 @@ void parse_condition(r_obj* condition, enum vctrs_ops* v_ops, r_ssize n_cols) {
     }
   } else {
     r_abort(
-      "`condition` must be length 1, or the same length "
-      "as the number of columns of the input."
+      "If `condition` is a character vector, it must be length 1, or the same "
+      "length as the number of columns of the input."
     );
   }
 }
@@ -1153,6 +1167,101 @@ enum matches_df_locs {
 };
 #define MATCHES_DF_SIZE R_ARR_SIZEOF(v_matches_df_types)
 
+static inline
+r_obj* new_vec_matches_result(r_ssize size) {
+  r_obj* names = KEEP(r_chr_n(v_matches_df_names_c_strings, MATCHES_DF_SIZE));
+
+  r_obj* out = KEEP(r_alloc_df_list(
+    size,
+    names,
+    v_matches_df_types,
+    MATCHES_DF_SIZE
+  ));
+  r_init_data_frame(out, size);
+
+  FREE(2);
+  return out;
+}
+
+// -----------------------------------------------------------------------------
+
+static
+r_obj* expand_match_on_nothing(r_ssize size_needles,
+                               r_ssize size_haystack,
+                               enum vctrs_multiple multiple,
+                               const struct vctrs_no_match* no_match) {
+  if (size_haystack == 0) {
+    // Handle empty `haystack` up front
+    // `no_match` everywhere, retaining size of `needles`
+
+    if (no_match->error && size_needles > 0) {
+      r_abort("Oh no! There were no matches for the `needle` at location %i.", 1);
+    }
+
+    r_obj* out = KEEP(new_vec_matches_result(size_needles));
+    int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
+    int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
+    r_ssize out_loc = 0;
+
+    const int elt_haystack = no_match->value;
+
+    for (r_ssize i = 0; i < size_needles; ++i) {
+      v_out_needles[out_loc] = i + 1;
+      v_out_haystack[out_loc] = elt_haystack;
+      ++out_loc;
+    }
+
+    FREE(1);
+    return out;
+  }
+
+  if (multiple == VCTRS_MULTIPLE_first || multiple == VCTRS_MULTIPLE_last) {
+    // Handle first/last cases next
+    r_obj* out = KEEP(new_vec_matches_result(size_needles));
+    int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
+    int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
+    r_ssize out_loc = 0;
+
+    const int elt_haystack = (multiple == VCTRS_MULTIPLE_first) ? 1 : size_haystack;
+
+    for (r_ssize i = 0; i < size_needles; ++i) {
+      v_out_needles[out_loc] = i + 1;
+      v_out_haystack[out_loc] = elt_haystack;
+      ++out_loc;
+    }
+
+    FREE(1);
+    return out;
+  }
+
+  if (size_haystack > 1 && size_needles > 0) {
+    if (multiple == VCTRS_MULTIPLE_error) {
+      r_abort("Oh no, multiple matches!");
+    } else if (multiple == VCTRS_MULTIPLE_warning) {
+      r_warn("Oh no, multiple matches! (but we are ok with that)");
+    }
+  }
+
+  r_ssize size = r_ssize_mult(size_needles, size_haystack);
+
+  r_obj* out = KEEP(new_vec_matches_result(size));
+  int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
+  int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
+  r_ssize out_loc = 0;
+
+  for (r_ssize i = 0; i < size_needles; ++i) {
+    for (r_ssize j = 0; j < size_haystack; ++j) {
+      v_out_needles[out_loc] = i + 1;
+      v_out_haystack[out_loc] = j + 1;
+      ++out_loc;
+    }
+  }
+
+  FREE(1);
+  return out;
+}
+
+// -----------------------------------------------------------------------------
 
 static
 r_obj* expand_compact_indices(const int* v_o_haystack,
@@ -1182,15 +1291,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     }
   }
 
-  r_obj* names = KEEP(r_chr_n(v_matches_df_names_c_strings, MATCHES_DF_SIZE));
-
-  r_obj* out = KEEP(r_alloc_df_list(
-    out_size,
-    names,
-    v_matches_df_types,
-    MATCHES_DF_SIZE
-  ));
-  r_init_data_frame(out, out_size);
+  r_obj* out = KEEP(new_vec_matches_result(out_size));
 
   int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
   int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
@@ -1282,7 +1383,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     FREE(2);
   }
 
-  FREE(3);
+  FREE(2);
   return out;
 }
 

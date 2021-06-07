@@ -558,3 +558,76 @@ test_that("zero row `haystack` still allows needle NA propagation", {
   expect_identical(res$haystack, c(0L, NA))
 })
 
+test_that("`condition = NULL` is correct in all possible cases", {
+  matches <- function(needles, haystack, multiple, no_match = NA_integer_) {
+    vec_matches(needles, haystack, condition = NULL, multiple = multiple, no_match = no_match)
+  }
+  exp <- function(needles, haystack) {
+    data_frame(needles = as.integer(needles), haystack = as.integer(haystack))
+  }
+
+  zero <- data_frame(.size = 0L)
+  one <- data_frame(.size = 1L)
+  two <- data_frame(.size = 2L)
+
+  multiples <- c("all", "warning", "error", "first", "last")
+
+  for (multiple in multiples) {
+    # `zero` haystack
+    expect_identical(matches(zero, zero, multiple = multiple), exp(integer(), integer()))
+    expect_identical(matches(one, zero, multiple = multiple), exp(1, NA))
+    expect_identical(matches(two, zero, multiple = multiple), exp(1:2, c(NA, NA)))
+  }
+
+  for (multiple in multiples) {
+    # `one` haystack
+    expect_identical(matches(zero, one, multiple = multiple), exp(integer(), integer()))
+    expect_identical(matches(one, one, multiple = multiple), exp(1, 1))
+    expect_identical(matches(two, one, multiple = multiple), exp(1:2, c(1, 1)))
+  }
+
+  # `two` haystack
+  expect_identical(matches(zero, two, multiple = "all"), exp(integer(), integer()))
+  expect_identical(matches(one, two, multiple = "all"), exp(c(1, 1), c(1, 2)))
+  expect_identical(matches(two, two, multiple = "all"), exp(c(1, 1, 2, 2), c(1, 2, 1, 2)))
+
+  expect_identical(matches(zero, two, multiple = "warning"), exp(integer(), integer()))
+  expect_identical(expect_warning(matches(one,  two, multiple = "warning")), exp(c(1, 1), c(1, 2)))
+  expect_identical(expect_warning(matches(two,  two, multiple = "warning")), exp(c(1, 1, 2, 2), c(1, 2, 1, 2)))
+
+  expect_identical(matches(zero, two, multiple = "error"), exp(integer(), integer()))
+  expect_error(matches(one, two, multiple = "error"), "multiple matches")
+  expect_error(matches(two, two, multiple = "error"), "multiple matches")
+
+  expect_identical(matches(zero, two, multiple = "first"), exp(integer(), integer()))
+  expect_identical(matches(one, two, multiple = "first"), exp(1, 1))
+  expect_identical(matches(two, two, multiple = "first"), exp(1:2, c(1, 1)))
+
+  expect_identical(matches(zero, two, multiple = "last"), exp(integer(), integer()))
+  expect_identical(matches(one, two, multiple = "last"), exp(1, 2))
+  expect_identical(matches(two, two, multiple = "last"), exp(1:2, c(2, 2)))
+
+  for (multiple in multiples) {
+    # `zero` haystack with `no_match = "error"`
+    expect_identical(matches(zero, zero, multiple = multiple, no_match = "error"), exp(integer(), integer()))
+    expect_error(matches(one, zero, multiple = multiple, no_match = "error"), "no matches")
+    expect_error(matches(two, zero, multiple = multiple, no_match = "error"), "no matches")
+  }
+})
+
+test_that("zero column data frames are not allowed if `condition != NULL`", {
+  expect_error(
+    vec_matches(data_frame(.size = 2L), data_frame(.size = 2L)),
+    "at least 1 column"
+  )
+})
+
+test_that("zero column input still checks `condition` correctness", {
+  x <- data_frame(.size = 2)
+  y <- data_frame(.size = 3)
+
+  expect_error(
+    vec_matches(x, y, condition = c("==", "<=")),
+    "length 1, or the same length as the number of columns"
+  )
+})

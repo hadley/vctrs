@@ -107,6 +107,12 @@ static inline
 enum vctrs_multiple parse_multiple(r_obj* multiple);
 
 static
+r_obj* expand_match_on_nothing(r_ssize size_needles,
+                               r_ssize size_haystack,
+                               enum vctrs_multiple multiple,
+                               const struct vctrs_no_match* no_match);
+
+static
 r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_o_haystack_starts,
                               struct r_dyn_array* p_match_sizes,
