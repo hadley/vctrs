@@ -446,6 +446,12 @@ test_that("multiple matches from a non-equi condition are returned in first appe
   expect_identical(res$haystack, c(1L, 2L))
 })
 
+test_that("`condition` is validated", {
+  expect_error(vec_matches(1, 2, condition = 1), "`condition` must be a character vector, or `NULL`")
+  expect_error(vec_matches(1, 2, condition = "x"), 'must only contain "==", ">", ">=", "<", or "<="')
+  expect_error(vec_matches(1, 2, condition = c("==", "==")), "must be length 1, or the same length as the number of columns of the input")
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - `multiple`
 
@@ -511,6 +517,12 @@ test_that("errors on multiple matches that come from different nested containmen
   )
 })
 
+test_that("`multiple` is validated", {
+  expect_error(vec_matches(1, 2, multiple = 1.5), "`multiple` must be a string")
+  expect_error(vec_matches(1, 2, multiple = c("first", "last")), "`multiple` must be a string")
+  expect_error(vec_matches(1, 2, multiple = "x"), '`multiple` must be one of "all", "first", "last", "warning", or "error"')
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - `no_match`
 
@@ -548,6 +560,11 @@ test_that("`no_match = 'error'` passes propagated NAs through untouched", {
 
   expect_identical(res$needles, 1:4)
   expect_identical(res$haystack, c(rep(NA, 3), 2L))
+})
+
+test_that("`no_match` is validated", {
+  expect_error(vec_matches(1, 2, no_match = 1.5), "length 1 integer, or \"error\"")
+  expect_error(vec_matches(1, 2, no_match = c(1L, 2L)), "length 1 integer, or \"error\"")
 })
 
 # ------------------------------------------------------------------------------
