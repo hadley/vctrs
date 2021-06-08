@@ -9,7 +9,8 @@
 #'
 #' @details
 #' [vec_match()] is identical to (but often slightly faster than)
-#' `vec_matches(needles, haystack, condition = "==", multiple = "first")`.
+#' `vec_matches(needles, haystack, condition = "==", multiple = "first",
+#' nan_distinct = TRUE)`.
 #'
 #' `vec_matches()` is extremely similar to a SQL left join between `needles` and
 #' `haystack`. Using `condition` is analogous to specifying a SQL ON statement,
