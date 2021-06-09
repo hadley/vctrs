@@ -131,13 +131,16 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct vctrs_arg* haystack_arg);
 
 static
-r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_ops);
+r_obj* compute_nested_containment_info(r_obj* haystack,
+                                       enum vctrs_multiple multiple,
+                                       const enum vctrs_ops* v_ops);
 
 static
 r_obj* nested_containment_order(r_obj* x,
                                 r_obj* order,
                                 r_obj* group_sizes,
-                                r_obj* outer_run_sizes);
+                                r_obj* outer_run_sizes,
+                                enum vctrs_multiple multiple);
 
 static inline
 int p_df_nested_containment_compare_ge_na_equal(const void* x,

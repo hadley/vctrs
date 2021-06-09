@@ -685,3 +685,58 @@ test_that("zero column input still checks `condition` correctness", {
     "length 1, or the same length as the number of columns"
   )
 })
+
+test_that("`multiple = 'first'/'last'` returns the first/last by appearance", {
+  x <- c(1, 2, 3)
+  y <- c(2, 1, 0)
+
+  res <- vec_matches(x, y, condition = ">=", multiple = "first")
+  expect_identical(res$haystack, c(2L, 1L, 1L))
+
+  res <- vec_matches(x, y, condition = ">=", multiple = "last")
+  expect_identical(res$haystack, c(3L, 3L, 3L))
+})
+
+# ------------------------------------------------------------------------------
+# vec_matches() - nested containment
+
+test_that("`multiple = 'first' doesn't require nested groups if completely ordered", {
+  # Single nested containment group.
+  # It is already completely ordered (in ascending order by value and row number).
+  df <- data_frame(x = c(1L, 1L, 2L, 3L))
+  res <- compute_nested_containment_info(df, ">=", "first")
+  nested_groups <- res[[2]]
+  expect_identical(nested_groups, integer())
+})
+
+test_that("`multiple = 'first'` requires increasing row order, and looks at group starts", {
+  # 2 different nested groups:
+  # - We are doing multiple = "first", so we are looking at group starts
+  # - Look at the 1 at location 2, it becomes the first group along with its
+  #   group partner at location 4.
+  # - Look at the 2 at location 3, it is greater than the 1 at location 1 in
+  #   both size and row number. It joins that group.
+  # - Look at the 3 at location 1, it is greater than the 1 at location 1,
+  #   but is smaller in row number. It becomes a new group with its partner at
+  #   location 5.
+  df <- data_frame(x = c(3L, 1L, 2L, 1L, 3L))
+  res <- compute_nested_containment_info(df, ">=", "first")
+  nested_groups <- res[[2]]
+  expect_identical(nested_groups, c(1L, 0L, 0L, 0L, 1L))
+})
+
+test_that("`multiple = 'last'` requires increasing row order, and looks at group ends", {
+  # 2 different nested groups:
+  # - We are doing multiple = "last", so we are looking at group ends
+  # - Look at the 1 at location 4, it becomes the first group along with its
+  #   group partner at location 2.
+  # - Look at the 2 at location 3, it is greater than the 1 at location 4,
+  #   but is smaller in row number. It becomes a new group.
+  # - Look at the 3 at location 5, it is greater than the 1 at location 4 in
+  #   both size and row number. It joins that group.
+  df <- data_frame(x = c(3L, 1L, 2L, 1L, 3L))
+  res <- compute_nested_containment_info(df, ">=", "last")
+  nested_groups <- res[[2]]
+  expect_identical(nested_groups, c(0L, 0L, 1L, 0L, 0L))
+})
+

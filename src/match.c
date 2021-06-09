@@ -231,7 +231,7 @@ r_obj* df_matches(r_obj* needles,
   r_obj* o_needles = KEEP_N(vec_order(needles, chrs_asc, chrs_smallest, true, r_null), &n_prot);
   const int* v_o_needles = r_int_cbegin(o_needles);
 
-  r_obj* info = KEEP_N(compute_nested_containment_info(haystack, v_ops), &n_prot);
+  r_obj* info = KEEP_N(compute_nested_containment_info(haystack, multiple, v_ops), &n_prot);
 
   r_obj* o_haystack = r_list_get(info, 0);
   const int* v_o_haystack = r_int_cbegin(o_haystack);
@@ -1423,15 +1423,20 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 // -----------------------------------------------------------------------------
 
 // [[ register() ]]
-r_obj* vctrs_test_compute_nested_containment_info(r_obj* haystack, r_obj* condition) {
+r_obj* vctrs_test_compute_nested_containment_info(r_obj* haystack,
+                                                  r_obj* condition,
+                                                  r_obj* multiple) {
   r_ssize n_cols = r_length(haystack);
   enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(n_cols, sizeof(enum vctrs_ops));
   parse_condition(condition, v_ops, n_cols);
-  return compute_nested_containment_info(haystack, v_ops);
+  enum vctrs_multiple c_multiple = parse_multiple(multiple);
+  return compute_nested_containment_info(haystack, c_multiple, v_ops);
 }
 
 static
-r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_ops) {
+r_obj* compute_nested_containment_info(r_obj* haystack,
+                                       enum vctrs_multiple multiple,
+                                       const enum vctrs_ops* v_ops) {
   r_ssize n_prot = 0;
 
   r_ssize n_cols = r_length(haystack);
@@ -1453,11 +1458,8 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
     break;
   }
 
-  bool any_nesting = any_directional && (n_cols - first_directional > 1);
-
-  if (!any_nesting) {
-    // Nested group info isn't required for only `==`, or when
-    // there is only 1 column after the last non-directional column
+  if (!any_directional) {
+    // Nested group info isn't required for only `==`
     r_list_poke(out, 0, vec_order(haystack, chrs_asc, chrs_smallest, true, r_null));
     r_list_poke(out, 1, vctrs_shared_empty_int);
     r_list_poke(out, 2, r_int(1));
@@ -1533,7 +1535,8 @@ r_obj* compute_nested_containment_info(r_obj* haystack, const enum vctrs_ops* v_
     haystack_inner,
     o_haystack,
     group_sizes_haystack,
-    outer_run_sizes
+    outer_run_sizes,
+    multiple
   ), &n_prot);
 
   int n_nested_groups = r_as_int(r_list_get(nested_info, 1));
@@ -1594,7 +1597,8 @@ static
 r_obj* nested_containment_order(r_obj* x,
                                 r_obj* order,
                                 r_obj* group_sizes,
-                                r_obj* outer_run_sizes) {
+                                r_obj* outer_run_sizes,
+                                enum vctrs_multiple multiple) {
   if (!is_data_frame(x)) {
     r_stop_internal("nested_containment_order", "`x` must be a data frame.");
   }
@@ -1603,6 +1607,14 @@ r_obj* nested_containment_order(r_obj* x,
 
   r_ssize n_cols = r_length(x);
   r_ssize size = r_length(order);
+
+  // For first/last, we require not only increasing order for each
+  // column, but also increasing row order as well. This can generate more
+  // groups, but ensures that the assignment loop of `df_matches_recurse()`
+  // works correctly for these cases.
+  const bool enforce_row_order =
+    multiple == VCTRS_MULTIPLE_first ||
+    multiple == VCTRS_MULTIPLE_last;
 
   r_obj* out = KEEP_N(r_alloc_list(2), &n_prot);
 
@@ -1624,10 +1636,12 @@ r_obj* nested_containment_order(r_obj* x,
     FREE(n_prot);
     return out;
   }
-  if (n_cols == 1) {
-    // If there is only 1 column, x is in increasing order already.
+  if (n_cols == 1 && !enforce_row_order) {
+    // If there is only 1 column, `x` is in increasing order already when
+    // ordered by `order`. If we don't require that the actual row numbers also
+    // be in order, then we are done.
     // If `outer_run_sizes` were supplied, each individual run group will
-    // be in increasing order (since the single x column is the one that
+    // be in increasing order (since the single `x` column is the one that
     // broke any ties), and that is all that is required.
     FREE(n_prot);
     return out;
@@ -1646,19 +1660,29 @@ r_obj* nested_containment_order(r_obj* x,
   PROTECT_POLY_VEC(p_poly_vec, &n_prot);
   const void* v_x = p_poly_vec->p_vec;
 
-  int i_order = v_group_sizes[0];
-  growable_push_int(&prev_rows, v_order[0] - 1);
+  int i_order_group_start = 0;
+  int group_size = v_group_sizes[0];
+  int i_order = i_order_group_start + ((multiple == VCTRS_MULTIPLE_last) ? group_size - 1 : 0);
 
-  r_ssize outer_run_stop = 0;
+  growable_push_int(&prev_rows, v_order[i_order] - 1);
+
+  r_ssize next_outer_run_start = 0;
   r_ssize outer_run_sizes_loc = 0;
   if (r_length(outer_run_sizes) > 0) {
-    // If no outer runs exist, `integer(0)` is used and `outer_run_stop = 0`
-    // will never match `i_order` since the first group size is at least 1.
-    outer_run_stop = v_outer_run_sizes[outer_run_sizes_loc];
+    // If no outer runs exist, `integer(0)` is used and `next_outer_run_start = 0`
+    // will never match `i_order_group_start` since the first group size is at least 1.
+    next_outer_run_start = v_outer_run_sizes[outer_run_sizes_loc];
     ++outer_run_sizes_loc;
   }
 
   for (r_ssize i_group = 1; i_group < n_groups; ++i_group) {
+    // Catch group start index up to current group using previous group size
+    i_order_group_start += group_size;
+    // Update to size of current group
+    group_size = v_group_sizes[i_group];
+    // Update index into order to point to either start / end of this group
+    i_order = i_order_group_start + ((multiple == VCTRS_MULTIPLE_last) ? group_size - 1 : 0);
+
     int cur_row = v_order[i_order] - 1;
 
     bool new_id = true;
@@ -1668,6 +1692,12 @@ r_obj* nested_containment_order(r_obj* x,
     for (; prev_row_id < max_prev_row_id; ++prev_row_id) {
       int prev_row = growable_get_int(&prev_rows, prev_row_id);
 
+      if (enforce_row_order && cur_row < prev_row) {
+        // Can't add to current group, `multiple = "first"/"last"`
+        // require increasing row indices per group
+        continue;
+      }
+
       if (p_df_nested_containment_compare_ge_na_equal(v_x, cur_row, v_x, prev_row)) {
         new_id = false;
         break;
@@ -1675,10 +1705,10 @@ r_obj* nested_containment_order(r_obj* x,
     }
 
     int id;
-    if (outer_run_stop == i_order) {
+    if (next_outer_run_start == i_order_group_start) {
       // Start of a new outer run
       id = 0;
-      outer_run_stop += v_outer_run_sizes[outer_run_sizes_loc];
+      next_outer_run_start += v_outer_run_sizes[outer_run_sizes_loc];
       ++outer_run_sizes_loc;
       prev_rows.n = 1;
       growable_set_int(&prev_rows, 0, cur_row);
@@ -1696,13 +1726,9 @@ r_obj* nested_containment_order(r_obj* x,
       growable_set_int(&prev_rows, prev_row_id, cur_row);
     }
 
-    int group_size = v_group_sizes[i_group];
-
     for (int i = 0; i < group_size; ++i) {
-      v_ids[v_order[i_order + i] - 1] = id;
+      v_ids[v_order[i_order_group_start + i] - 1] = id;
     }
-
-    i_order += group_size;
   }
 
   FREE(n_prot);
