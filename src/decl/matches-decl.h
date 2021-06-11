@@ -2,6 +2,7 @@ static
 r_obj* vec_matches(r_obj* needles,
                    r_obj* haystack,
                    r_obj* condition,
+                   r_obj* filter,
                    bool na_equal,
                    const struct vctrs_no_match* no_match,
                    enum vctrs_multiple multiple,
@@ -20,6 +21,8 @@ r_obj* df_matches(r_obj* needles,
                   bool na_equal,
                   const struct vctrs_no_match* no_match,
                   enum vctrs_multiple multiple,
+                  bool any_filters,
+                  const enum vctrs_filter* v_filters,
                   enum vctrs_ops* v_ops,
                   struct vctrs_arg* needles_arg,
                   struct vctrs_arg* haystack_arg);
@@ -38,12 +41,14 @@ void df_matches_recurse(r_ssize col,
                         const int* v_o_haystack,
                         bool na_equal,
                         enum vctrs_multiple multiple,
+                        bool any_filters,
+                        const enum vctrs_filter* v_filters,
                         enum vctrs_ops* v_ops,
                         struct r_dyn_array* p_o_haystack_starts,
                         struct r_dyn_array* p_match_sizes,
                         struct r_dyn_array* p_needles_locs,
-                        r_ssize* p_n_extra,
-                        r_ssize* p_which_multiple);
+                        int* v_loc_filtered_match,
+                        r_ssize* p_n_extra);
 
 static
 void df_matches_with_nested_groups(r_ssize size_haystack,
@@ -60,12 +65,14 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    const int* v_o_haystack,
                                    bool na_equal,
                                    enum vctrs_multiple multiple,
+                                   bool any_filters,
+                                   const enum vctrs_filter* v_filters,
                                    enum vctrs_ops* v_ops,
                                    struct r_dyn_array* p_o_haystack_starts,
                                    struct r_dyn_array* p_match_sizes,
                                    struct r_dyn_array* p_needles_locs,
-                                   r_ssize* p_n_extra,
-                                   r_ssize* p_which_multiple);
+                                   int* v_loc_filtered_match,
+                                   r_ssize* p_n_extra);
 
 static inline
 r_ssize int_locate_upper_missing(const int* v_haystack_missings,
@@ -108,6 +115,12 @@ struct vctrs_no_match parse_no_match(r_obj* no_match);
 static inline
 enum vctrs_multiple parse_multiple(r_obj* multiple);
 
+static inline
+void parse_filter(r_obj* filter,
+                  r_ssize n_cols,
+                  enum vctrs_filter* v_filters,
+                  bool* p_any_filters);
+
 static
 r_obj* expand_match_on_nothing(r_ssize size_needles,
                                r_ssize size_haystack,
@@ -125,8 +138,13 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               bool skip_needles_locs,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
-                              bool any_multiple,
+                              enum vctrs_multiple multiple,
+                              r_ssize size_needles,
                               bool any_directional,
+                              bool has_loc_filtered_match,
+                              const enum vctrs_filter* v_filters,
+                              const int* v_loc_filtered_match,
+                              const struct poly_df_data* p_haystack,
                               struct vctrs_arg* needles_arg,
                               struct vctrs_arg* haystack_arg);
 
@@ -147,6 +165,20 @@ int p_df_nested_containment_compare_ge_na_equal(const void* x,
                                                 r_ssize i,
                                                 const void* y,
                                                 r_ssize j);
+
+static inline
+int p_matches_df_compare_na_equal(const void* x,
+                                  r_ssize i,
+                                  const void* y,
+                                  r_ssize j,
+                                  const enum vctrs_filter* v_filters);
+
+static inline
+bool p_matches_df_equal_na_equal(const void* x,
+                                 r_ssize i,
+                                 const void* y,
+                                 r_ssize j,
+                                 const enum vctrs_filter* v_filters);
 
 static inline
 r_ssize midpoint(r_ssize lhs, r_ssize rhs);

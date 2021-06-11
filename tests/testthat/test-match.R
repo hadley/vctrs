@@ -574,6 +574,135 @@ test_that("`no_match` is validated", {
 })
 
 # ------------------------------------------------------------------------------
+# vec_matches() - filter
+
+test_that("simple `filter`s work", {
+  needles <- c(1, 2, 4)
+  haystack <- c(2, 1, 3, 0)
+
+  res <- vec_matches(needles, haystack, condition = "<", filter = "max")
+  expect_identical(res$haystack, c(3L, 3L, NA))
+
+  res <- vec_matches(needles, haystack, condition = "<", filter = "min")
+  expect_identical(res$haystack, c(1L, 3L, NA))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max")
+  expect_identical(res$haystack, c(2L, 1L, 3L))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "min")
+  expect_identical(res$haystack, c(4L, 4L, 4L))
+})
+
+test_that("haystack duplicates are preserved", {
+  needles <- c(1, 2, 4)
+  haystack <- c(2, 1, 2, 3, 0, 1, 0)
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max")
+  expect_identical(res$needles, c(1L, 1L, 2L, 2L, 3L))
+  expect_identical(res$haystack, c(2L, 6L, 1L, 3L, 4L))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "min")
+  expect_identical(res$needles, c(1L, 1L, 2L, 2L, 3L, 3L))
+  expect_identical(res$haystack, c(5L, 7L, 5L, 7L, 5L, 7L))
+})
+
+test_that("haystack duplicates can be controlled by `multiple`", {
+  needles <- c(1, 2, 4)
+  haystack <- c(2, 1, 2, 3, 0, 1, 0)
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max", multiple = "first")
+  expect_identical(res$needles, 1:3)
+  expect_identical(res$haystack, c(2L, 1L, 4L))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max", multiple = "last")
+  expect_identical(res$needles, 1:3)
+  expect_identical(res$haystack, c(6L, 3L, 4L))
+})
+
+test_that("`filter` works when valid matches are in different nested containment groups", {
+  needles <- data_frame(x = 0L, y = 1L, z = 2L)
+  haystack <- data_frame(x = c(1L, 2L, 1L, 0L), y = c(2L, 1L, 2L, 3L), z = c(3L, 3L, 2L, 2L))
+
+  info <- compute_nested_containment_info(haystack, c("<=", "<=", "<="), "all")
+  haystack_order <- info[[1]]
+  nested_groups <- info[[2]]
+
+  # Rows 1 and 2 of haystack are in different nested containment groups, but
+  # both have the "max" filter value of `z=3` so both should be in the result.
+  # Row 4 is in its own containment group, so it will be considered the "max"
+  # of its group, but it is less than rows 1 and 2 so it will ultimately be
+  # filtered out.
+  expect_identical(nested_groups, c(1L, 2L, 1L, 0L))
+  expect_identical(haystack_order, c(4L, 3L, 1L, 2L))
+
+  res <- vec_matches(needles, haystack, condition = c("<=", "<=", "<="), filter = c("none", "none", "max"))
+  expect_identical(res$needles, c(1L, 1L))
+  expect_identical(res$haystack, c(1L, 2L))
+
+  res <- vec_matches(needles, haystack, condition = c("<=", "<=", "<="), filter = c("none", "none", "max"), multiple = "first")
+  expect_identical(res$haystack, 1L)
+
+  res <- vec_matches(needles, haystack, condition = c("<=", "<=", "<="), filter = c("none", "none", "max"), multiple = "last")
+  expect_identical(res$haystack, 2L)
+})
+
+test_that("single filter is applied to all columns", {
+  needles <- data_frame(x = 5L, y = 8L, z = 4L)
+  haystack <- data_frame(x = c(1L, 3L, 2L, 2L), y = c(1L, 3L, 2L, 3L), z = c(1L, 2L, 3L, 3L))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max")
+  expect_identical(res$haystack, 2L)
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "min")
+  expect_identical(res$haystack, 1L)
+})
+
+test_that("different `filter`s can be used per column", {
+  needles <- data_frame(x = c(0, 2, 1, 1), y = c(2, 0, 0, 4))
+  haystack <- data_frame(x = c(2, 2, 2, 1, 1), y = c(1, 1, 2, 2, 1))
+
+  res <- vec_matches(needles, haystack, condition = c(">=", "<"), filter = c("max", "min"))
+  expect_identical(res$needles, c(1L, 2L, 2L, 3L, 4L))
+  expect_identical(res$haystack, c(NA, 1L, 2L, 5L, NA))
+})
+
+test_that("`filter` works with missing values", {
+  needles <- c(1, NA, 4, NA)
+  haystack <- c(NA, 1, NA, 1, 3)
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max", na_equal = TRUE)
+  expect_identical(res$needles, c(1L, 1L, 2L, 2L, 3L, 4L, 4L))
+  expect_identical(res$haystack, c(2L, 4L, 1L, 3L, 5L, 1L, 3L))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max", na_equal = TRUE, multiple = "first")
+  expect_identical(res$needles, 1:4)
+  expect_identical(res$haystack, c(2L, 1L, 5L, 1L))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "max", na_equal = FALSE)
+  expect_identical(res$needles, c(1L, 1L, 2L, 3L, 4L))
+  expect_identical(res$haystack, c(2L, 4L, NA, 5L, NA))
+})
+
+test_that("`filter` works with mixed NA and NaN", {
+  needles <- c(1, NA, 4, NaN)
+  haystack <- c(NA, 1, NaN, 1, 3)
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "min", na_equal = TRUE, nan_distinct = FALSE)
+  expect_identical(res$needles, c(1L, 1L, 2L, 2L, 3L, 3L, 4L, 4L))
+  expect_identical(res$haystack, c(2L, 4L, 1L, 3L, 2L, 4L, 1L, 3L))
+
+  res <- vec_matches(needles, haystack, condition = ">=", filter = "min", na_equal = TRUE, nan_distinct = TRUE)
+  expect_identical(res$needles, c(1L, 1L, 2L, 3L, 3L, 4L))
+  expect_identical(res$haystack, c(2L, 4L, 1L, 2L, 4L, 3L))
+})
+
+test_that("`filter` is validated", {
+  expect_error(vec_matches(1, 2, filter = 1.5), "character vector")
+  expect_error(vec_matches(1, 2, filter = "x"), 'one of "none", "min", or "max"')
+  expect_error(vec_matches(1, 2, filter = c("min", "max")), "length 1, or the same length as")
+})
+
+# ------------------------------------------------------------------------------
 # vec_matches() - edge cases
 
 test_that("zero row `needles` results in zero row data frame output", {

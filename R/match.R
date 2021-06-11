@@ -49,7 +49,25 @@
 #'     for each column.
 #'   - Alternatively, specify `NULL` to perform a cross match. In this case,
 #'     every observation of `needles` matches against every observation of
-#'     `haystack`, regardless of the specific values.
+#'     `haystack`, regardless of the specific values. This overrides any usage
+#'     of `filter`.
+#'
+#' @param filter Filter to be applied to the matched results.
+#'   - If `"none"`, no filter is applied.
+#'   - If `"min"`, only the minimum haystack value matching the current needle
+#'     is returned.
+#'   - If `"max"`, only the maximum haystack value matching the current needle
+#'     is returned.
+#'   - For data frames, a length `1` or `ncol(needles)` character vector
+#'     containing only the above options, specifying a filter to apply to
+#'     each column.
+#'
+#'   Filters don't have any effect on `"=="` conditions, but are useful for
+#'   computing "rolling" matches with other conditions.
+#'
+#'   A filter can return multiple haystack matches for a particular needle
+#'   if the maximum or minimum haystack value is duplicated in `haystack`. These
+#'   can be further controlled with `multiple`.
 #'
 #' @param na_equal Treatment of missing values.
 #'   - If `TRUE`, missing values in `needles` are allowed to match against
@@ -133,6 +151,18 @@
 #'   y = vec_slice(y, matches$haystack)
 #' )
 #'
+#' # You can limit which matches are returned with a `filter`. For example,
+#' # with the above example you can filter the matches returned by `x[[i]] >= y`
+#' # down to only the ones containing the maximum value of those matches.
+#' matches <- vec_matches(x, y, condition = ">=", filter = "max")
+#'
+#' # Here, the matches for the `3` needle value have been filtered down to
+#' # only include the maximum haystack value of those matches, `2`.
+#' data_frame(
+#'   x = vec_slice(x, matches$needles),
+#'   y = vec_slice(y, matches$haystack)
+#' )
+#'
 #' # You can also specify `condition = NULL` to generate a cross match where
 #' # every observation in `needles` matches all observations in `haystack`.
 #' # This ignores the actual values, and depends only on the size of the inputs.
@@ -162,11 +192,21 @@
 #'   value = vec_slice(values, matches$needle),
 #'   upper = vec_slice(upper, matches$haystack)
 #' )
+#'
+#' # We can return only the most recent lower bound by applying a filter.
+#' # This is also known as a rolling join.
+#' matches <- vec_matches(values, lower, condition = ">=", filter = "max")
+#'
+#' data_frame(
+#'   value = vec_slice(values, matches$needle),
+#'   most_recent_lower = vec_slice(lower, matches$haystack),
+#' )
 #' @noRd
 vec_matches <- function(needles,
                         haystack,
                         ...,
                         condition = "==",
+                        filter = "none",
                         na_equal = TRUE,
                         no_match = NA_integer_,
                         multiple = "all",
@@ -183,6 +223,7 @@ vec_matches <- function(needles,
     needles,
     haystack,
     condition,
+    filter,
     na_equal,
     no_match,
     multiple,
