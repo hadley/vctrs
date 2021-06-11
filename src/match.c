@@ -604,7 +604,9 @@ void df_matches_recurse(r_ssize col,
   }
   }
 
-  if (!needle_is_missing && (op == VCTRS_OPS_gt || op == VCTRS_OPS_gte)) {
+  if (!needle_is_missing &&
+      (op == VCTRS_OPS_gt || op == VCTRS_OPS_gte) &&
+      (grp_lower_o_haystack <= grp_upper_o_haystack)) {
     // In this specific case, a non-NA needle may match an NA in the haystack
     // from the condition adjustments made above. If there was an NA in the
     // haystack, we avoid including it by shifting the lower bound to 1 past

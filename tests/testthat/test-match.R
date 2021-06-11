@@ -697,6 +697,12 @@ test_that("`multiple = 'first'/'last'` returns the first/last by appearance", {
   expect_identical(res$haystack, c(3L, 3L, 3L))
 })
 
+test_that("NA adjustment of `>` and `>=` conditions is protected from empty haystack", {
+  res <- vec_matches(1L, integer(), condition = ">")
+  expect_identical(res$needles, 1L)
+  expect_identical(res$haystack, NA_integer_)
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - nested containment
 
