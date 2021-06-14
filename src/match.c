@@ -311,6 +311,9 @@ r_obj* df_matches(r_obj* needles,
     p_needles_locs->count = size_needles;
   }
 
+  // When filtering, we find the filtered match for a particular needle in each
+  // nested containment group of the haystack. `loc_filtered_match` keeps track
+  // of the overall filtered match loc for a needle across all nested groups.
   bool has_loc_filtered_match =
     any_filters &&
     (multiple == VCTRS_MULTIPLE_all ||
