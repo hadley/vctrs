@@ -1661,9 +1661,9 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 
       if (any_multiple) {
         if (multiple == VCTRS_MULTIPLE_error) {
-          stop_matches_multiple(i, needles_arg, haystack_arg);
+          stop_matches_multiple(loc_needles - 1, needles_arg, haystack_arg);
         } else if (multiple == VCTRS_MULTIPLE_warning) {
-          warn_matches_multiple(i, needles_arg, haystack_arg);
+          warn_matches_multiple(loc_needles - 1, needles_arg, haystack_arg);
         }
       }
     }
