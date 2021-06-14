@@ -29,10 +29,10 @@ r_obj* df_matches(r_obj* needles,
 
 static
 void df_matches_recurse(r_ssize col,
-                        r_ssize lower_o_needles,
-                        r_ssize upper_o_needles,
-                        r_ssize lower_o_haystack,
-                        r_ssize upper_o_haystack,
+                        r_ssize loc_lower_o_needles,
+                        r_ssize loc_upper_o_needles,
+                        r_ssize loc_lower_o_haystack,
+                        r_ssize loc_upper_o_haystack,
                         const struct poly_df_data* p_needles,
                         const struct poly_df_data* p_haystack,
                         const struct poly_df_data* p_needles_missings,
@@ -44,10 +44,10 @@ void df_matches_recurse(r_ssize col,
                         bool any_filters,
                         const enum vctrs_filter* v_filters,
                         const enum vctrs_ops* v_ops,
-                        struct r_dyn_array* p_o_haystack_starts,
+                        struct r_dyn_array* p_locs_start_o_haystack,
                         struct r_dyn_array* p_match_sizes,
-                        struct r_dyn_array* p_needles_locs,
-                        int* v_loc_filtered_match,
+                        struct r_dyn_array* p_locs_needles,
+                        int* v_locs_filter_match_haystack,
                         r_ssize* p_n_extra);
 
 static
@@ -55,8 +55,8 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    int n_nested_groups,
                                    const int* v_nested_groups,
                                    r_ssize col,
-                                   r_ssize lower_o_needles,
-                                   r_ssize upper_o_needles,
+                                   r_ssize loc_lower_o_needles,
+                                   r_ssize loc_upper_o_needles,
                                    const struct poly_df_data* p_needles,
                                    const struct poly_df_data* p_haystack,
                                    const struct poly_df_data* p_needles_missings,
@@ -68,29 +68,29 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    bool any_filters,
                                    const enum vctrs_filter* v_filters,
                                    const enum vctrs_ops* v_ops,
-                                   struct r_dyn_array* p_o_haystack_starts,
+                                   struct r_dyn_array* p_locs_start_o_haystack,
                                    struct r_dyn_array* p_match_sizes,
-                                   struct r_dyn_array* p_needles_locs,
-                                   int* v_loc_filtered_match,
+                                   struct r_dyn_array* p_locs_needles,
+                                   int* v_locs_filter_match_haystack,
                                    r_ssize* p_n_extra);
 
 static inline
 r_ssize int_locate_upper_missing(const int* v_haystack_missings,
                                  const int* v_o_haystack,
-                                 r_ssize lower_o_haystack,
-                                 r_ssize upper_o_haystack);
+                                 r_ssize loc_lower_o_haystack,
+                                 r_ssize loc_upper_o_haystack);
 static inline
 r_ssize int_lower_duplicate(int needle,
                             const int* v_haystack,
                             const int* v_o_haystack,
-                            r_ssize lower_o_haystack,
-                            r_ssize upper_o_haystack);
+                            r_ssize loc_lower_o_haystack,
+                            r_ssize loc_upper_o_haystack);
 static inline
 r_ssize int_upper_duplicate(int needle,
                             const int* v_haystack,
                             const int* v_o_haystack,
-                            r_ssize lower_o_haystack,
-                            r_ssize upper_o_haystack);
+                            r_ssize loc_lower_o_haystack,
+                            r_ssize loc_upper_o_haystack);
 
 static
 r_obj* df_joint_ranks(r_obj* x,
@@ -131,19 +131,19 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
 
 static
 r_obj* expand_compact_indices(const int* v_o_haystack,
-                              struct r_dyn_array* p_o_haystack_starts,
+                              struct r_dyn_array* p_locs_start_o_haystack,
                               struct r_dyn_array* p_match_sizes,
-                              struct r_dyn_array* p_needles_locs,
+                              struct r_dyn_array* p_locs_needles,
                               bool skip_match_sizes,
-                              bool skip_needles_locs,
+                              bool skip_locs_needles,
                               bool na_equal,
                               const struct vctrs_no_match* no_match,
                               enum vctrs_multiple multiple,
                               r_ssize size_needles,
                               bool any_directional,
-                              bool has_loc_filtered_match,
+                              bool has_locs_filter_match_haystack,
                               const enum vctrs_filter* v_filters,
-                              const int* v_loc_filtered_match,
+                              const int* v_locs_filter_match_haystack,
                               const struct poly_df_data* p_haystack,
                               struct vctrs_arg* needles_arg,
                               struct vctrs_arg* haystack_arg);
