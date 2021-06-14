@@ -24,6 +24,10 @@ library(stringr)
 library(ggplot2)
 library(dplyr)
 library(forcats)
+library(data.table)
+
+vec_order <- vctrs:::vec_order_radix
+forderv <- data.table:::forderv
 ```
 
 ```{r}
@@ -112,7 +116,12 @@ df <- bench::press(
   n_groups = n_groups,
   {
     x <- sample(n_groups, size, replace = TRUE)
-    bench::mark(vec_order(x), base_order(x), iterations = 50)
+    bench::mark(
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
+      iterations = 50
+    )
   }
 )
 ```
@@ -139,7 +148,12 @@ df <- bench::press(
   n_groups = n_groups,
   {
     x <- sample(n_groups, size, replace = TRUE)
-    bench::mark(vec_order(x), base_order(x), iterations = 10)
+    bench::mark(
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
+      iterations = 10
+    )
   }
 )
 ```
@@ -164,7 +178,12 @@ df <- bench::press(
   n_groups = n_groups,
   {
     x <- sample(n_groups, size, replace = TRUE)
-    bench::mark(vec_order(x), base_order(x), iterations = 20)
+    bench::mark(
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
+      iterations = 20
+    )
   }
 )
 ```
@@ -213,7 +232,12 @@ df <- bench::press(
   n_groups = n_groups,
   {
     x <- sample(n_groups, size, replace = TRUE) + 0
-    bench::mark(vec_order(x), base_order(x), iterations = 50)
+    bench::mark(
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
+      iterations = 50
+    )
   }
 )
 ```
@@ -242,8 +266,9 @@ df <- bench::press(
     x <- sample(n_groups, size, replace = TRUE) + 0
     
     bench::mark(
-      vec_order(x),
-      base_order(x),
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
       iterations = 10
     )
   }
@@ -286,7 +311,12 @@ df <- bench::press(
   {
     dict <- new_dictionary(n_groups, min_length = 5, max_length = 20)
     x <- sample(dict, size, replace = TRUE)
-    bench::mark(vec_order(x), base_order(x), iterations = 50)
+    bench::mark(
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
+      iterations = 50
+    )
   }
 )
 ```
@@ -321,7 +351,12 @@ df <- bench::press(
   {
     dict <- new_dictionary(n_groups, min_length = 5, max_length = 20)
     x <- sample(dict, size, replace = TRUE)
-    bench::mark(vec_order(x), base_order(x), iterations = 10)
+    bench::mark(
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
+      iterations = 10
+    )
   }
 )
 ```
@@ -362,7 +397,12 @@ n_groups <- 1e7
 
 x <- new_dictionary(n_groups, min_length = 5, max_length = 20)
 
-bench::mark(vec_order(x), base_order(x), iterations = 10)
+bench::mark(
+  vec_order(x), 
+  base_order(x), 
+  forderv(x, na.last = TRUE),
+  iterations = 10
+)
 ```
 
 ### Test 4
@@ -388,7 +428,12 @@ df <- bench::press(
   {
     dict <- new_dictionary(n_groups, string_size, string_size)
     x <- sample(dict, size, replace = TRUE)
-    bench::mark(vec_order(x), base_order(x), iterations = 10)
+    bench::mark(
+      vec_order(x), 
+      base_order(x), 
+      forderv(x, na.last = TRUE),
+      iterations = 10
+    )
   }
 )
 ```
@@ -440,14 +485,17 @@ x <- 1:1e7 + 0L
 # Base is faster (simpler check + ALTREP result)
 bench::mark(
   vec_order(x), 
-  base_order(x),
-  iterations = 50
+  base_order(x), 
+  forderv(x, na.last = TRUE),
+  iterations = 50,
+  check = FALSE
 )
 
 # But tweak some options and it becomes closer
 bench::mark(
   vec_order(x, direction = "desc", na_value = "smallest"), 
   base_order(x, decreasing = TRUE, na.last = FALSE),
+  forderv(x, order = -1L, na.last = FALSE),
   iterations = 50
 )
 ```
@@ -461,7 +509,8 @@ x <- c(1:1e7, 1:20) + 0L
 
 bench::mark(
   vec_order(x), 
-  base_order(x),
+  base_order(x), 
+  forderv(x, na.last = TRUE),
   iterations = 20
 )
 ```
@@ -473,8 +522,9 @@ x <- c(1:1e7, 1:20) + 0
 
 bench::mark(
   vec_order(x), 
-  base_order(x),
-  iterations = 20
+  base_order(x), 
+  forderv(x, na.last = TRUE),
+  iterations = 10
 )
 ```
 
@@ -505,7 +555,12 @@ df <- data.frame(
   y = sample(n_groups2, size, replace = TRUE)
 )
 
-bench::mark(vec_order(df), base_order(df), iterations = 10)
+bench::mark(
+  vec_order(df), 
+  base_order(df), 
+  forderv(df, na.last = TRUE),
+  iterations = 10
+)
 ```
 
 ### Test 2a
@@ -531,7 +586,12 @@ df <- data.frame(
   y = sample(n_groups2, size, replace = TRUE) + 0
 )
 
-bench::mark(vec_order(df), base_order(df), iterations = 10)
+bench::mark(
+  vec_order(df), 
+  base_order(df), 
+  forderv(df, na.last = TRUE),
+  iterations = 10
+)
 ```
 
 ### Test 2b
@@ -556,7 +616,12 @@ df <- data.frame(
   y = sample(dict2, size, replace = TRUE) + 0
 )
 
-bench::mark(vec_order(df), base_order(df), iterations = 10)
+bench::mark(
+  vec_order(df), 
+  base_order(df), 
+  forderv(df, na.last = TRUE),
+  iterations = 10
+)
 ```
 
 ### Test 3a
@@ -578,7 +643,12 @@ cols <- replicate(n_cols, sample(n_groups, size, TRUE), simplify = FALSE)
 names(cols) <- seq_along(cols)
 df <- vctrs::new_data_frame(cols, size)
 
-bench::mark(vec_order(df), base_order(df), iterations = 10)
+bench::mark(
+  vec_order(df), 
+  base_order(df), 
+  forderv(df, na.last = TRUE),
+  iterations = 10
+)
 ```
 
 ### Test 3b
@@ -604,5 +674,10 @@ cols <- replicate(
 names(cols) <- seq_along(cols)
 df <- vctrs::new_data_frame(cols, size)
 
-bench::mark(vec_order(df), base_order(df), iterations = 10)
+bench::mark(
+  vec_order(df), 
+  base_order(df), 
+  forderv(df, na.last = TRUE),
+  iterations = 10
+)
 ```

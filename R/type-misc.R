@@ -2,8 +2,18 @@
 # `numeric_version` from base ----------------------------------------
 
 #' @export
-vec_proxy.numeric_version <- function(x, ...) x
+vec_proxy.numeric_version <- function(x, ...) {
+  x
+}
 
+#' @export
+vec_proxy_compare.numeric_version <- function(x, ...) {
+  # Encodes `x` as a character vector representing the numeric versions.
+  # In the C locale, this compare the same as you'd expect `x` to.
+  x <- .encode_numeric_version(x)
+  x <- unstructure(x)
+  x
+}
 
 # `omit` from base ---------------------------------------------------
 

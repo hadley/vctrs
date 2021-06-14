@@ -1,5 +1,6 @@
 
 test_that("`numeric_version` is a vector (#723)", {
+  w <- numeric_version("1.1")
   x <- numeric_version("0.1.0")
   y <- numeric_version("0.2.0")
   z <- c(x, y)
@@ -12,6 +13,12 @@ test_that("`numeric_version` is a vector (#723)", {
 
   expect_identical(vec_unique(z), z)
   expect_identical(vec_unique(c(y, z, x)), z[2:1])
+
+  expect_identical(vec_compare(w, w), 0L)
+  expect_identical(vec_compare(w, x), 1L)
+  expect_identical(vec_compare(x, y), -1L)
+
+  expect_identical(vec_sort(c(y, w, y, x)), c(x, y, y, w))
 })
 
 test_that("`numeric_version` falls back to base methods", {

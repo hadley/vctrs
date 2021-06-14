@@ -475,6 +475,8 @@ extern SEXP chrs_cast;
 extern SEXP chrs_error;
 extern SEXP chrs_combine;
 extern SEXP chrs_convert;
+extern SEXP chrs_asc;
+extern SEXP chrs_largest;
 
 extern SEXP syms_i;
 extern SEXP syms_n;

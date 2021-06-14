@@ -74,7 +74,11 @@ local_comparable_tuple <- function(frame = caller_env()) {
   # Compare only on first field
   local_methods(
     .frame = frame,
-    vec_proxy_equal.vctrs_tuple = function(x, ...) field(x, "x")
+    vec_proxy_equal.vctrs_tuple = function(x, ...) field(x, "x"),
+    vec_proxy_compare.vctrs_tuple = function(x, ...) {
+      # override vec_proxy_compare.vctrs_rcrd
+      field(x, "x")
+    }
   )
 }
 

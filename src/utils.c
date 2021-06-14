@@ -1538,6 +1538,8 @@ SEXP chrs_cast = NULL;
 SEXP chrs_error = NULL;
 SEXP chrs_combine = NULL;
 SEXP chrs_convert = NULL;
+SEXP chrs_asc = NULL;
+SEXP chrs_largest = NULL;
 
 SEXP syms_i = NULL;
 SEXP syms_n = NULL;
@@ -1755,6 +1757,8 @@ void vctrs_init_utils(SEXP ns) {
   chrs_error = r_new_shared_character("error");
   chrs_combine = r_new_shared_character("combine");
   chrs_convert = r_new_shared_character("convert");
+  chrs_asc = r_new_shared_character("asc");
+  chrs_largest = r_new_shared_character("largest");
 
   classes_tibble = r_new_shared_vector(STRSXP, 3);
 

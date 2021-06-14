@@ -13,7 +13,9 @@ knitr::opts_chunk$set(fig.width = 10)
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
-Investigates performance of `vec_order()` vs current implementation of `vec_unique()`, which is based on hashing and a dictionary. It might be worth switching to use the sort based approach of `vec_order()`.
+Investigates performance of hash based (`vec_unique_loc()`) vs sort based (`vec_unique_loc2()`) approaches to ordering.
+
+Remember that, in addition to any potential speed ups, the sort based approach also works for large vectors where the dictionary approach currently fails due to an overflow (https://github.com/r-lib/vctrs/issues/1133).
 
 ## Setup
 
@@ -23,6 +25,8 @@ library(rlang)
 library(stringr)
 library(ggplot2)
 library(dplyr)
+
+vec_unique_loc2 <- vctrs:::vec_unique_loc2
 ```
 
 ```{r}
@@ -77,8 +81,6 @@ plot_bench <- function(df, title = waiver()) {
 
 It is worth comparing to `vec_unique_loc()`, which is the most bare bones of the uniqueness functions, to test whether or not uniqueness-by-sorting can be faster than uniqueness-by-hashing.
 
-In a branch, I hacked together an implementation of `vec_unique_loc()` based on `vec_order()`. It takes approximately the same amount of time as `vec_order()` itself, so I will just use `vec_order()` as a proxy for the sorting approach.
-
 ## Integers
 
 ### Test 1
@@ -99,26 +101,19 @@ df <- bench::press(
   {
     x <- sample(n_groups, size, replace = TRUE)
     bench::mark(
-      vec_order(x), vec_unique_loc(x), 
-      iterations = 100, check = FALSE
+      vec_unique_loc2(x), 
+      vec_unique_loc(x), 
+      iterations = 100
     )
   }
 )
 ```
 
-Performance is generally the same for small sizes
+For very small sizes, `vec_unique_loc()` is a little faster. Probably due to the allocations required to set up `vec_unique_loc2()`. This difference disappears relatively fast.
 
 ```{r, echo=FALSE}
 plot_bench(df, "Integers (small)")
 ```
-
-However, `size = 10000` seems to already show `vec_order()` being faster.
-
-```{r}
-df[-1] %>%
-  filter(size == 10000)
-```
-
 
 ### Test 2
 
@@ -138,14 +133,15 @@ df <- bench::press(
   {
     x <- sample(n_groups, size, replace = TRUE)
     bench::mark(
-      vec_order(x), vec_unique_loc(x), 
-      iterations = 20, check = FALSE
+      vec_unique_loc2(x), 
+      vec_unique_loc(x), 
+      iterations = 20
     )
   }
 )
 ```
 
-As the total size increases, `vec_order()` starts to do better.
+As the total size increases, `vec_unique_loc2()` starts to do better.
 
 ```{r, echo = FALSE}
 plot_bench(df, "Integers (large)")
@@ -153,7 +149,7 @@ plot_bench(df, "Integers (large)")
 
 ### Test 3
 
-This benchmark shows how much better `vec_order()` scales for large size and large number of groups. For integers it is always faster, and scales extremely well.
+This benchmark shows how much better `vec_unique_loc2()` scales for large size and large number of groups. For integers it is always faster, and scales extremely well.
 
 ```{r}
 set.seed(123)
@@ -167,8 +163,9 @@ df <- bench::press(
   {
     x <- sample(n_groups, size, replace = TRUE)
     bench::mark(
-      vec_order(x), vec_unique_loc(x), 
-      iterations = 20, check = FALSE
+      vec_unique_loc2(x), 
+      vec_unique_loc(x), 
+      iterations = 20
     )
   }
 )
@@ -208,14 +205,15 @@ df <- bench::press(
   {
     x <- sample(n_groups, size, replace = TRUE) + 0
     bench::mark(
-      vec_order(x), vec_unique_loc(x), 
-      iterations = 100, check = FALSE
+      vec_unique_loc2(x), 
+      vec_unique_loc(x), 
+      iterations = 100,
     )
   }
 )
 ```
 
-`vec_order()` is generally a bit slower for these smaller sizes, but it scales much better with large sizes and larger number of groups. See the next test.
+`vec_unique_loc2()` is generally a bit slower for these smaller sizes, but it scales much better with large sizes and larger number of groups. See the next test.
 
 ```{r, echo=FALSE}
 plot_bench(df, "Doubles (small size)")
@@ -223,7 +221,7 @@ plot_bench(df, "Doubles (small size)")
 
 ### Test 2
 
-This benchmark shows how much better `vec_order()` scales for large size and large number of groups. For doubles it is slower up front, but scales much better.
+This benchmark shows how much better `vec_unique_loc2()` scales for large size and large number of groups. For doubles it is slower up front (large unavoidable allocations when there are few groups), but scales much better.
 
 ```{r}
 set.seed(123)
@@ -237,8 +235,9 @@ df <- bench::press(
   {
     x <- sample(n_groups, size, replace = TRUE) + 0
     bench::mark(
-      vec_order(x), vec_unique_loc(x), 
-      iterations = 20, check = FALSE
+      vec_unique_loc2(x), 
+      vec_unique_loc(x), 
+      iterations = 20, 
     )
   }
 )
@@ -262,13 +261,9 @@ df %>%
 
 ### Test 1
 
-Currently string ordering is much slower than `vec_unique_loc()` (especially when most strings are unique) due to all of the allocations that are required + the fact that it does a radix ordering of unique strings and then an integer radix ordering after that.
-
-I am confident that the C level part of `vec_order()` could gain a `sort_character = false` option that would do a much faster counting sort in order-of-first-appearance that utilizes the truelengths in a different way. It wouldn't sort strings at all, so should be very fast. This is what `cgroup()` does in `base::order()`, which is not currently implemented in `vec_order()` because I didn't have a use for it until now. https://github.com/wch/r-source/blob/8d7ac4699fba640d030703fa010b66bf26054cbd/src/main/radixsort.c#L1051
-
 Very large set of strings with 10 groups
 
-- Don't notice much of a difference between the two here, because there aren't many unique strings.
+Don't notice much of a difference between the two here.
 
 ```{r}
 set.seed(123)
@@ -279,12 +274,16 @@ n_groups <- 10
 dict <- new_dictionary(n_groups, min_length = 5, max_length = 20)
 x <- sample(dict, size, TRUE)
 
-bench::mark(vec_order(x), vec_unique_loc(x), iterations = 10, check = FALSE)
+bench::mark(
+  vec_unique_loc2(x),
+  vec_unique_loc(x), 
+  iterations = 10
+)
 ```
 
 Very large set of completely random strings
 
-- Extremely large difference, because `vec_order()` is doing way too much work to actually sort the strings.
+Ordering character vectors by first appearance (i.e. using `vec_order_info(chr_ordered = FALSE)`) in `vec_unique_loc2()` allows it to remain competitive with `vec_unique_loc()`.
 
 ```{r}
 set.seed(123)
@@ -293,7 +292,11 @@ n_groups <- 1e7
 
 x <- new_dictionary(n_groups, min_length = 5, max_length = 20)
 
-bench::mark(vec_order(x), vec_unique_loc(x), iterations = 10, check = FALSE)
+bench::mark(
+  vec_unique_loc2(x), 
+  vec_unique_loc(x), 
+  iterations = 10
+)
 ```
 
 ## Multiple columns
@@ -314,16 +317,15 @@ names(cols) <- seq_along(cols)
 df <- vctrs::new_data_frame(cols, size)
 
 bench::mark(
-  vec_order(df), 
+  vec_unique_loc2(df), 
   vec_unique_loc(df), 
-  iterations = 10,
-  check = FALSE
+  iterations = 10
 )
 ```
 
 ### Test 2
 
-Same as before but with character columns. We do worse here because as mentioned before, we do too much work in `vec_order()` right now with character vectors.
+Again, pretty competitive with `vec_unique_loc()` due to ordering characters by first appearance.
 
 ```{r}
 set.seed(123)
@@ -345,10 +347,9 @@ names(cols) <- seq_along(cols)
 df <- vctrs::new_data_frame(cols, size)
 
 bench::mark(
-  vec_order(df), 
+  vec_unique_loc2(df), 
   vec_unique_loc(df), 
-  iterations = 5,
-  check = FALSE
+  iterations = 5
 )
 ```
 
@@ -368,9 +369,8 @@ names(cols) <- seq_along(cols)
 df <- vctrs::new_data_frame(cols, size)
 
 bench::mark(
-  vec_order(df), 
+  vec_unique_loc2(df), 
   vec_unique_loc(df), 
-  iterations = 5,
-  check = FALSE
+  iterations = 5
 )
 ```
