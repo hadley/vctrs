@@ -12,10 +12,10 @@
 
 enum vctrs_multiple {
   VCTRS_MULTIPLE_all = 0,
-  VCTRS_MULTIPLE_warning = 1, // Warning + all
-  VCTRS_MULTIPLE_first = 2,
-  VCTRS_MULTIPLE_last = 3,
-  VCTRS_MULTIPLE_error = 4
+  VCTRS_MULTIPLE_warning = 1, // Collects multiple matches like all, warns if there are any
+  VCTRS_MULTIPLE_error = 2, // Collects multiple matches like all, errors if there are any
+  VCTRS_MULTIPLE_first = 3,
+  VCTRS_MULTIPLE_last = 4
 };
 
 enum vctrs_filter {
