@@ -1,0 +1,45 @@
+
+default message
+===============
+
+> vec_matches(1L, c(1L, 1L), multiple = "warning")
+Warning: Each element can match at most 1 observation.
+x The element at location 1 has multiple matches.
+
+  needles haystack
+1       1        1
+2       1        2
+
+
+can control arg names
+=====================
+
+> vec_matches(1L, c(1L, 1L), multiple = "warning", needles_arg = "foo")
+Warning: Each element of `foo` can match at most 1 observation.
+x The element at location 1 has multiple matches.
+
+  needles haystack
+1       1        1
+2       1        2
+
+> vec_matches(1L, c(1L, 1L), multiple = "warning", needles_arg = "foo",
++ haystack_arg = "bar")
+Warning: Each element of `foo` can match at most 1 observation from `bar`.
+x The element at location 1 has multiple matches.
+
+  needles haystack
+1       1        1
+2       1        2
+
+
+with `condition = NULL`
+=======================
+
+> vec_matches(1, 1:2, multiple = "warning", condition = NULL)
+Warning: Each element can match at most 1 observation.
+x The element at location 1 has multiple matches.
+
+  needles haystack
+1       1        1
+2       1        2
+

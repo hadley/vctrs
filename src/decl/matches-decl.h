@@ -192,3 +192,8 @@ static inline
 void stop_matches_multiple(r_ssize i,
                            struct vctrs_arg* needles_arg,
                            struct vctrs_arg* haystack_arg);
+
+static inline
+void warn_matches_multiple(r_ssize i,
+                           struct vctrs_arg* needles_arg,
+                           struct vctrs_arg* haystack_arg);

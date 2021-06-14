@@ -503,11 +503,25 @@ test_that("`multiple` can error informatively", {
   })
 })
 
-test_that("can warn on `multiple` matches (with fallback to all)", {
+test_that("`multiple` can warn informatively", {
+  verify_output(test_path("error", "test-matches-multiple-warning.txt"), {
+    "# default message"
+    vec_matches(1L, c(1L, 1L), multiple = "warning")
+
+    "# can control arg names"
+    vec_matches(1L, c(1L, 1L), multiple = "warning", needles_arg = "foo")
+    vec_matches(1L, c(1L, 1L), multiple = "warning", needles_arg = "foo", haystack_arg = "bar")
+
+    "# with `condition = NULL`"
+    vec_matches(1, 1:2, multiple = "warning", condition = NULL)
+  })
+})
+
+test_that("warning falls back to 'all'", {
   expect_identical(
     expect_warning(
       vec_matches(c(1L, 3L, 1L, 3L), c(1L, 3L, 1L), multiple = "warning"),
-      "multiple matches"
+      class = "vctrs_warning_matches_multiple"
     ),
     vec_matches(c(1L, 3L, 1L, 3L), c(1L, 3L, 1L), multiple = "all")
   )

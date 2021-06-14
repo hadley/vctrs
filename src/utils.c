@@ -1592,6 +1592,7 @@ SEXP syms_stop_incompatible_type = NULL;
 SEXP syms_stop_incompatible_size = NULL;
 SEXP syms_stop_matches_nothing = NULL;
 SEXP syms_stop_matches_multiple = NULL;
+SEXP syms_warn_matches_multiple = NULL;
 SEXP syms_action = NULL;
 SEXP syms_vctrs_common_class_fallback = NULL;
 SEXP syms_fallback_class = NULL;
@@ -1863,6 +1864,7 @@ void vctrs_init_utils(SEXP ns) {
   syms_stop_incompatible_size = Rf_install("stop_incompatible_size");
   syms_stop_matches_nothing = Rf_install("stop_matches_nothing");
   syms_stop_matches_multiple = Rf_install("stop_matches_multiple");
+  syms_warn_matches_multiple = Rf_install("warn_matches_multiple");
   syms_action = Rf_install("action");
   syms_vctrs_common_class_fallback = Rf_install(c_strs_vctrs_common_class_fallback);
   syms_fallback_class = Rf_install("fallback_class");

@@ -508,6 +508,7 @@ extern SEXP syms_stop_incompatible_type;
 extern SEXP syms_stop_incompatible_size;
 extern SEXP syms_stop_matches_nothing;
 extern SEXP syms_stop_matches_multiple;
+extern SEXP syms_warn_matches_multiple;
 extern SEXP syms_action;
 extern SEXP syms_vctrs_common_class_fallback;
 extern SEXP syms_fallback_class;

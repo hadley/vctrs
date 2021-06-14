@@ -243,6 +243,14 @@ stop_matches <- function(class = NULL, ...) {
   )
 }
 
+warn_matches <- function(message, class = NULL, ...) {
+  warn_vctrs(
+    message = message,
+    class = c(class, "vctrs_warning_matches"),
+    ...
+  )
+}
+
 # ------------------------------------------------------------------------------
 
 stop_matches_nothing <- function(i, needles_arg, haystack_arg) {
@@ -291,14 +299,17 @@ stop_matches_multiple <- function(i, needles_arg, haystack_arg) {
 
 #' @export
 cnd_header.vctrs_error_matches_multiple <- function(cnd, ...) {
-  if (nzchar(cnd$needles_arg)) {
-    needles_name <- glue::glue(" of `{cnd$needles_arg}` ")
+  cnd_matches_multiple_header(cnd$needles_arg, cnd$haystack_arg)
+}
+cnd_matches_multiple_header <- function(needles_arg, haystack_arg) {
+  if (nzchar(needles_arg)) {
+    needles_name <- glue::glue(" of `{needles_arg}` ")
   } else {
     needles_name <- " "
   }
 
-  if (nzchar(cnd$haystack_arg)) {
-    haystack_name <- glue::glue(" from `{cnd$haystack_arg}`")
+  if (nzchar(haystack_arg)) {
+    haystack_name <- glue::glue(" from `{haystack_arg}`")
   } else {
     haystack_name <- ""
   }
@@ -308,7 +319,28 @@ cnd_header.vctrs_error_matches_multiple <- function(cnd, ...) {
 
 #' @export
 cnd_body.vctrs_error_matches_multiple <- function(cnd, ...) {
-  bullet <- glue::glue("The element at location {cnd$i} has multiple matches.")
+  cnd_matches_multiple_body(cnd$i)
+}
+cnd_matches_multiple_body <- function(i) {
+  bullet <- glue::glue("The element at location {i} has multiple matches.")
   bullet <- c(x = bullet)
   format_error_bullets(bullet)
+}
+
+# ------------------------------------------------------------------------------
+
+warn_matches_multiple <- function(i, needles_arg, haystack_arg) {
+  message <- paste(
+    cnd_matches_multiple_header(needles_arg, haystack_arg),
+    cnd_matches_multiple_body(i),
+    sep = "\n"
+  )
+
+  warn_matches(
+    message = message,
+    class = "vctrs_warning_matches_multiple",
+    i = i,
+    needles_arg = needles_arg,
+    haystack_arg = haystack_arg
+  )
 }

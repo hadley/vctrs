@@ -1507,7 +1507,7 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
     if (multiple == VCTRS_MULTIPLE_error) {
       stop_matches_multiple(0, needles_arg, haystack_arg);
     } else if (multiple == VCTRS_MULTIPLE_warning) {
-      r_warn("Oh no, multiple matches! (but we are ok with that)");
+      warn_matches_multiple(0, needles_arg, haystack_arg);
     }
   }
 
@@ -1663,7 +1663,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
         if (multiple == VCTRS_MULTIPLE_error) {
           stop_matches_multiple(i, needles_arg, haystack_arg);
         } else if (multiple == VCTRS_MULTIPLE_warning) {
-          r_warn("Oh no, multiple matches! (but we are ok with that)");
+          warn_matches_multiple(i, needles_arg, haystack_arg);
         }
       }
     }
@@ -2200,6 +2200,28 @@ void stop_matches_multiple(r_ssize i,
   Rf_eval(call, vctrs_ns_env);
 
   never_reached("stop_matches_multiple");
+}
+
+static inline
+void warn_matches_multiple(r_ssize i,
+                           struct vctrs_arg* needles_arg,
+                           struct vctrs_arg* haystack_arg) {
+  r_obj* syms[4] = {
+    syms_i,
+    syms_needles_arg,
+    syms_haystack_arg,
+    NULL
+  };
+  r_obj* args[4] = {
+    KEEP(r_int((int)i + 1)),
+    KEEP(vctrs_arg(needles_arg)),
+    KEEP(vctrs_arg(haystack_arg)),
+    NULL
+  };
+
+  r_obj* call = KEEP(r_call_n(syms_warn_matches_multiple, syms, args));
+  Rf_eval(call, vctrs_ns_env);
+  FREE(4);
 }
 
 // -----------------------------------------------------------------------------
