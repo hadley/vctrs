@@ -5,7 +5,6 @@
 #include "poly-op.h"
 #include "compare.h"
 #include "ptype2.h"
-#include "translate.h"
 #include "order-radix.h"
 
 // -----------------------------------------------------------------------------
