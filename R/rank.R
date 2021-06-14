@@ -10,12 +10,12 @@
 #' `nan_distinct = FALSE`, `NaN` values are given the same rank as `NA`,
 #' otherwise they are given a rank that differentiates them from `NA`.
 #'
-#' Like [vec_order_radix()], ordering is done in the C-locale. This can affect
+#' Like [vec_order()], ordering is done in the C-locale. This can affect
 #' the ranks of character vectors, especially regarding how uppercase and
-#' lowercase letters are ranked. See the Details section of [vec_order_radix()]
+#' lowercase letters are ranked. See the documentation of [vec_order()]
 #' for more information.
 #'
-#' @inheritParams vec_order_radix
+#' @inheritParams vec_order
 #' @inheritParams ellipsis::dots_empty
 #'
 #' @param ties Treatment of duplicate values.

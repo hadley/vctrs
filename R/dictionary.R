@@ -59,9 +59,9 @@ vec_count <- function(x, sort = c("count", "key", "location", "none")) {
   }
 
   idx <- switch(sort,
-    location = order(kv$key),
+    location = vec_order(kv$key),
     key = vec_order(df$key),
-    count = order(-kv$val)
+    count = vec_order(-kv$val)
   )
 
   df <- vec_slice(df, idx)

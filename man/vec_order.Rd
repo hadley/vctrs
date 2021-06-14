@@ -5,16 +5,65 @@
 \alias{vec_sort}
 \title{Order and sort vectors}
 \usage{
-vec_order(x, direction = c("asc", "desc"), na_value = c("largest", "smallest"))
+vec_order(
+  x,
+  ...,
+  direction = "asc",
+  na_value = "largest",
+  nan_distinct = FALSE,
+  chr_transform = NULL
+)
 
-vec_sort(x, direction = c("asc", "desc"), na_value = c("largest", "smallest"))
+vec_sort(
+  x,
+  ...,
+  direction = "asc",
+  na_value = "largest",
+  nan_distinct = FALSE,
+  chr_transform = NULL
+)
 }
 \arguments{
 \item{x}{A vector}
 
-\item{direction}{Direction to sort in. Defaults to \code{asc}ending.}
+\item{...}{These dots are for future extensions and must be empty.}
 
-\item{na_value}{Should \code{NA}s be treated as the largest or smallest values?}
+\item{direction}{Direction to sort in.
+\itemize{
+\item A single \code{"asc"} or \code{"desc"} for ascending or descending order
+respectively.
+\item For data frames, a length \code{1} or \code{ncol(x)} character vector containing
+only \code{"asc"} or \code{"desc"}, specifying the direction for each column.
+}}
+
+\item{na_value}{Treatment of missing values.
+\itemize{
+\item A single \code{"largest"} or \code{"smallest"} for treating missing values as the
+largest or smallest values respectively.
+\item For data frames, a length \code{1} or \code{ncol(x)} character vector containing
+only \code{"largest"} or \code{"smallest"}, specifying how missing values should
+be treated in each column.
+}}
+
+\item{nan_distinct}{A single logical specifying whether or not \code{NaN} should
+be considered distinct from \code{NA} for double and complex vectors. If \code{TRUE},
+\code{NaN} will always be ordered between \code{NA} and non-missing numbers.}
+
+\item{chr_transform}{Transformation of character vectors for sorting in
+alternate locales.
+\itemize{
+\item If \code{NULL}, no transformation is done.
+\item Otherwise, this must be a function of one argument. The function will be
+invoked with \code{x}, if it is a character vector, after it has been
+translated to UTF-8, and should return a character vector with the same
+length as \code{x}. The result should sort as expected in the C-locale,
+regardless of encoding.
+\item For data frames, \code{chr_transform} will be applied to all character
+columns.
+}
+
+Common transformation functions include: \code{tolower()} for case-insensitive
+ordering and \code{stringi::str_sort_key()} for locale-aware ordering.}
 }
 \value{
 \itemize{
@@ -23,16 +72,41 @@ vec_sort(x, direction = c("asc", "desc"), na_value = c("largest", "smallest"))
 }
 }
 \description{
-Order and sort vectors
+\code{vec_order()} computes the order of \code{x}. For data frames, the order is
+computed along the rows by computing the order of the first column and
+using subsequent columns to break ties.
+
+\code{vec_sort()} sorts \code{x}. It is equivalent to \code{vec_slice(x, vec_order(x))}.
 }
 \section{Differences with \code{order()}}{
 
-Unlike the \code{na.last} argument of \code{order()} which decides the
-positions of missing values irrespective of the \code{decreasing}
-argument, the \code{na_value} argument of \code{vec_order()} interacts with
-\code{direction}. If missing values are considered the largest value,
-they will appear last in ascending order, and first in descending
-order.
+
+Unlike the \code{na.last} argument of \code{order()} which decides the positions of
+missing values irrespective of the \code{decreasing} argument, the \code{na_value}
+argument of \code{vec_order()} interacts with \code{direction}. If missing values
+are considered the largest value, they will appear last in ascending order,
+and first in descending order.
+
+Character vectors are ordered in the C-locale. This is different from
+\code{base::order()}, which respects \code{base::Sys.setlocale()}. Sorting in a
+consistent locale can produce more reproducible results between different
+sessions and platforms, however, the results of sorting in the C-locale
+can be surprising. For example, capital letters sort before lower case
+letters. Sorting \code{c("b", "C", "a")} with \code{vec_sort()} will return
+\code{c("C", "a", "b")}, but with \code{base::order()} will return \code{c("a", "b", "C")}
+unless \code{base::order(method = "radix")} is explicitly set, which also uses
+the C-locale. While sorting with the C-locale can be useful for
+algorithmic efficiency, in many real world uses it can be the cause of
+data analysis mistakes. To balance these trade-offs, you can supply a
+\code{chr_transform} to transform character vectors into an alternative
+representation that orders in the C-locale in a less surprising way. For
+example, providing \code{\link[base:chartr]{base::tolower()}} as a transform will order the original
+vector in a case-insensitive manner. Locale-aware ordering can be achieved
+by providing \code{stringi::stri_sort_key()} as a transform, setting the
+collation options as appropriate for your locale.
+
+Character vectors are always translated to UTF-8 before ordering, and before
+any transform is applied by \code{chr_transform}.
 }
 
 \section{Dependencies of \code{vec_order()}}{
@@ -45,26 +119,39 @@ order.
 \section{Dependencies of \code{vec_sort()}}{
 
 \itemize{
-\item \code{\link[=vec_proxy_order]{vec_proxy_order()}}
 \item \code{\link[=vec_order]{vec_order()}}
 \item \code{\link[=vec_slice]{vec_slice()}}
 }
 }
 
 \examples{
-x <- round(c(runif(9), NA), 3)
+x <- round(sample(runif(5), 9, replace = TRUE), 3)
+x <- c(x, NA)
+
 vec_order(x)
 vec_sort(x)
-vec_sort(x, "desc")
+vec_sort(x, direction = "desc")
 
 # Can also handle data frames
 df <- data.frame(g = sample(2, 10, replace = TRUE), x = x)
 vec_order(df)
 vec_sort(df)
-vec_sort(df, "desc")
+vec_sort(df, direction = "desc")
 
-# Missing values interpreted as largest values are last when
-# in increasing order:
-vec_order(c(1, NA), na_value = "largest", direction = "asc")
-vec_order(c(1, NA), na_value = "largest", direction = "desc")
+# For data frames, `direction` and `na_value` are allowed to be vectors
+# with length equal to the number of columns in the data frame
+vec_sort(
+  df,
+  direction = c("desc", "asc"),
+  na_value = c("largest", "smallest")
+)
+
+# Character vectors are ordered in the C locale, which orders capital letters
+# below lowercase ones
+y <- c("B", "A", "a")
+vec_sort(y)
+
+# To order in a case-insensitive manner, provide a `chr_transform` that
+# transforms the strings to all lowercase
+vec_sort(y, chr_transform = tolower)
 }

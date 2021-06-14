@@ -10,8 +10,8 @@
  * Copyright (c) 2020, Data table team
  */
 
-#ifndef VCTRS_ORDER_RADIX_H
-#define VCTRS_ORDER_RADIX_H
+#ifndef VCTRS_ORDER_H
+#define VCTRS_ORDER_H
 
 #include "vctrs.h"
 

@@ -1,5 +1,25 @@
 # vctrs (development version)
 
+* `vec_order()` and `vec_sort()` now use a custom radix sort algorithm, rather
+  than relying on `order()`. The implementation is based on data.table’s
+  `forder()` and their earlier contribution to R’s `order()`. There are four
+  major changes, outlined below, the first two of which are breaking changes. If
+  you need to retain the old ordering behavior, use `vec_order_base()`.
+  
+  * Character vectors now order in the C locale by default, which is _much_
+    faster than ordering in the system's locale. To order in a specific locale,
+    you can provide a transformation function through `chr_transform`, such as
+    `stringi::stri_sort_key()`.
+  
+  * Optional arguments, such as `direction` and `na_value`, must now be
+    specified by name. Specifying by position will result in an error.
+    
+  * When ordering data frames, you can now control the behavior of `direction`
+    and `na_value` on a per column basis.
+    
+  * There is a new `nan_distinct` argument for differentiating between `NaN`
+    and `NA` in double and complex vectors.
+
 * The `xtfrm()` method for vctrs_vctr objects no longer accidentally breaks
   ties (#1354).
 

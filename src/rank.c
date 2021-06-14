@@ -1,7 +1,7 @@
 #include <rlang.h>
 #include "vctrs.h"
 #include "equal.h"
-#include "order-radix.h"
+#include "order.h"
 
 enum ties {
   TIES_min,
