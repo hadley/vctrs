@@ -189,6 +189,9 @@ static inline
 r_ssize midpoint(r_ssize lhs, r_ssize rhs);
 
 static inline
+void stop_matches_overflow(double size);
+
+static inline
 void stop_matches_nothing(r_ssize i,
                           struct vctrs_arg* needles_arg,
                           struct vctrs_arg* haystack_arg);

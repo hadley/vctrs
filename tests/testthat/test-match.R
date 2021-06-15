@@ -917,6 +917,16 @@ test_that("`condition = NULL` works with `no_match = 'drop'`", {
   expect_identical(res$haystack, integer())
 })
 
+test_that("potential overflow on large output size is caught informatively", {
+  verify_output(test_path("error", "test-matches-overflow-output.txt"), {
+    "# catches potential overflow"
+    vec_matches(1:1e7, 1:1e7, condition = ">=")
+
+    "# catches overflow with `condition = NULL`"
+    vec_matches(1:1e7, 1:1e7, condition = NULL)
+  })
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - nested containment
 

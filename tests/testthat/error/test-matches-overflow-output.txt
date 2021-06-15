@@ -1,0 +1,14 @@
+
+catches potential overflow
+==========================
+
+> vec_matches(1:1e+07, 1:1e+07, condition = ">=")
+Error: Match procedure results in an allocation larger than 2^31-1 elements. Attempted allocation size was 50000005000000. Please report this to the vctrs maintainers at <https://github.com/r-lib/vctrs/issues>.
+
+
+catches overflow with `condition = NULL`
+========================================
+
+> vec_matches(1:1e+07, 1:1e+07, condition = NULL)
+Error: Match procedure results in an allocation larger than 2^31-1 elements. Attempted allocation size was 100000000000000. Please report this to the vctrs maintainers at <https://github.com/r-lib/vctrs/issues>.
+

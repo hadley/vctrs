@@ -1561,6 +1561,10 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
 
   r_ssize size_out = r_ssize_mult(size_needles, size_haystack);
 
+  if (size_out > R_LEN_T_MAX) {
+    stop_matches_overflow((double) size_out);
+  }
+
   r_obj* out = KEEP(new_vec_matches_result(size_out));
   int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
   int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
@@ -1609,13 +1613,27 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
   if (skip_match_sizes) {
     size_out = n_used;
   } else {
+    double dbl_size_out = 0;
+
     for (r_ssize i = 0; i < n_used; ++i) {
-      // TODO: Check for overflow?
       // This could get extremely large with improperly specified non-equi joins.
       // May over-allocate in the case of `filters` with `multiple = "all"`,
       // or when `no_match = "drop"` or `missing = "drop"`.
-      size_out += (r_ssize) v_match_sizes[i];
+      dbl_size_out += (double) v_match_sizes[i];
     }
+
+    if (dbl_size_out > R_LEN_T_MAX) {
+      // TODO: Update this after a switch to long vector support
+      r_abort(
+        "Match procedure results in an allocation larger than 2^31-1 elements. "
+        "Attempted allocation size was %.0lf. "
+        "Please report this to the vctrs maintainers at "
+        "<https://github.com/r-lib/vctrs/issues>.",
+        dbl_size_out
+      );
+    }
+
+    size_out = (r_ssize) dbl_size_out;
   }
 
   r_obj* out = KEEP(new_vec_matches_result(size_out));
@@ -2229,6 +2247,17 @@ r_ssize midpoint(r_ssize lhs, r_ssize rhs) {
 }
 
 // -----------------------------------------------------------------------------
+
+static inline
+void stop_matches_overflow(double size) {
+  r_abort(
+    "Match procedure results in an allocation larger than 2^31-1 elements. "
+    "Attempted allocation size was %.0lf. "
+    "Please report this to the vctrs maintainers at "
+    "<https://github.com/r-lib/vctrs/issues>.",
+    size
+  );
+}
 
 static inline
 void stop_matches_nothing(r_ssize i,
