@@ -305,8 +305,6 @@ r_obj* df_matches(r_obj* needles,
   // If we can skip, `locs_needles` will always be an increasing sequence of values
   const bool skip_locs_needles = (multiple == VCTRS_MULTIPLE_first || multiple == VCTRS_MULTIPLE_last);
 
-  // TODO: Also don't need `locs_needles` when `n_nested_groups == 1` (even if multiple="all"),
-  // as this implies that there is no nested and the locations are again an ordered sequence.
   struct r_dyn_array* p_locs_needles = NULL;
   if (!skip_locs_needles) {
     p_locs_needles = r_new_dyn_vector(R_TYPE_integer, initial_capacity);
