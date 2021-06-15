@@ -588,15 +588,6 @@ static inline void growable_push_int(struct growable* g, int i) {
   ++(g->n);
 }
 
-static inline int growable_get_int(struct growable* g, r_ssize i) {
-  int* p = (int*) g->array;
-  return p[i];
-}
-static inline void growable_set_int(struct growable* g, r_ssize i, int value) {
-  int* p = (int*) g->array;
-  p[i] = value;
-}
-
 #define PROTECT_GROWABLE(g, n) do {             \
     PROTECT_WITH_INDEX((g)->x, &((g)->idx));    \
     *n += 1;                                    \

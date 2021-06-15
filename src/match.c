@@ -2023,8 +2023,8 @@ r_obj* nested_containment_order(r_obj* x,
 
   r_ssize n_groups = r_length(group_sizes);
 
-  struct growable prev_rows = new_growable(INTSXP, 10000);
-  PROTECT_GROWABLE(&prev_rows, &n_prot);
+  struct r_dyn_array* p_prev_rows = r_new_dyn_vector(R_TYPE_integer, 10000);
+  KEEP_N(p_prev_rows->shelter, &n_prot);
 
   struct poly_vec* p_poly_vec = new_poly_vec(x, vctrs_type_dataframe);
   PROTECT_POLY_VEC(p_poly_vec, &n_prot);
@@ -2034,7 +2034,9 @@ r_obj* nested_containment_order(r_obj* x,
   int group_size = v_group_sizes[0];
   int i_order = i_order_group_start + ((multiple == VCTRS_MULTIPLE_last) ? group_size - 1 : 0);
 
-  growable_push_int(&prev_rows, v_order[i_order] - 1);
+  const int first_row = v_order[i_order] - 1;
+  p_prev_rows->count = 1;
+  R_ARR_POKE(int, p_prev_rows, 0, first_row);
 
   r_ssize next_outer_run_start = 0;
   r_ssize outer_run_sizes_loc = 0;
@@ -2057,10 +2059,10 @@ r_obj* nested_containment_order(r_obj* x,
 
     bool new_id = true;
     int prev_row_id = 0;
-    int max_prev_row_id = prev_rows.n;
+    int max_prev_row_id = p_prev_rows->count;
 
     for (; prev_row_id < max_prev_row_id; ++prev_row_id) {
-      int prev_row = growable_get_int(&prev_rows, prev_row_id);
+      int prev_row = R_ARR_GET(int, p_prev_rows, prev_row_id);
 
       if (enforce_row_order && cur_row < prev_row) {
         // Can't add to current group, `multiple = "first"/"last"`
@@ -2080,20 +2082,20 @@ r_obj* nested_containment_order(r_obj* x,
       id = 0;
       next_outer_run_start += v_outer_run_sizes[outer_run_sizes_loc];
       ++outer_run_sizes_loc;
-      prev_rows.n = 1;
-      growable_set_int(&prev_rows, 0, cur_row);
+      p_prev_rows->count = 1;
+      R_ARR_POKE(int, p_prev_rows, 0, cur_row);
     } else if (new_id) {
       // Completely new id for this outer run, which we add to the end
       id = max_prev_row_id;
-      growable_push_int(&prev_rows, cur_row);
+      r_arr_push_back(p_prev_rows, &cur_row);
 
-      if (prev_rows.n > *p_n_ids) {
-        *p_n_ids = prev_rows.n;
+      if (p_prev_rows->count > *p_n_ids) {
+        *p_n_ids = p_prev_rows->count;
       }
     } else {
       // Update existing row location to the current row, since it is larger
       id = prev_row_id;
-      growable_set_int(&prev_rows, prev_row_id, cur_row);
+      R_ARR_POKE(int, p_prev_rows, prev_row_id, cur_row);
     }
 
     for (int i = 0; i < group_size; ++i) {
