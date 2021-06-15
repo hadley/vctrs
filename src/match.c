@@ -1775,8 +1775,10 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     // Can also happen with `no_match = "drop"` or `missing = "drop"`.
     size_out = loc_out;
     r_init_data_frame(out, size_out);
-    r_list_poke(out, MATCHES_DF_LOCS_needles, r_int_resize(out_needles, size_out));
-    r_list_poke(out, MATCHES_DF_LOCS_haystack, r_int_resize(out_haystack, size_out));
+    out_needles = r_int_resize(out_needles, size_out);
+    r_list_poke(out, MATCHES_DF_LOCS_needles, out_needles);
+    out_haystack = r_int_resize(out_haystack, size_out);
+    r_list_poke(out, MATCHES_DF_LOCS_haystack, out_haystack);
     v_out_needles = r_int_begin(out_needles);
     v_out_haystack = r_int_begin(out_haystack);
   }
