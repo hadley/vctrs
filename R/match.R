@@ -90,6 +90,17 @@
 #'     the result.
 #'   - If `"error"`, an error will be thrown if any `needles` have zero matches.
 #'
+#' @param remaining Handling of `haystack` values that `needles` never matched.
+#'   - If `"drop"`, remaining `haystack` values are completely dropped
+#'     from the result. Typically, this is the desired behavior if you only
+#'     care when `needles` has a match.
+#'   - If a single integer is provided (often `NA`), this represents the value
+#'     returned in the `needles` column for the remaining `haystack` values
+#'     that `needles` never matched. Remaining `haystack` values are always
+#'     returned at the end of the result.
+#'   - If `"error"`, an error will be thrown if there are any remaining
+#'     `haystack` values.
+#'
 #' @param multiple Handling of `needles` with multiple matches. For each needle:
 #'   - `"all"` returns every match detected in `haystack`.
 #'   - `"first"` returns the first match detected in `haystack` (this is similar
@@ -216,6 +227,7 @@ vec_matches <- function(needles,
                         filter = "none",
                         missing = "match",
                         no_match = NA_integer_,
+                        remaining = "drop",
                         multiple = "all",
                         nan_distinct = FALSE,
                         chr_transform = NULL,
@@ -233,6 +245,7 @@ vec_matches <- function(needles,
     filter,
     missing,
     no_match,
+    remaining,
     multiple,
     nan_distinct,
     chr_transform,
@@ -289,6 +302,41 @@ cnd_header.vctrs_error_matches_nothing <- function(cnd, ...) {
 #' @export
 cnd_body.vctrs_error_matches_nothing <- function(cnd, ...) {
   bullet <- glue::glue("The element at location {cnd$i} does not have a match.")
+  bullet <- c(x = bullet)
+  format_error_bullets(bullet)
+}
+
+# ------------------------------------------------------------------------------
+
+stop_matches_remaining <- function(i, needles_arg, haystack_arg) {
+  stop_matches(
+    class = "vctrs_error_matches_remaining",
+    i = i,
+    needles_arg = needles_arg,
+    haystack_arg = haystack_arg
+  )
+}
+
+#' @export
+cnd_header.vctrs_error_matches_remaining <- function(cnd, ...) {
+  if (nzchar(cnd$haystack_arg)) {
+    haystack_name <- glue::glue(" of `{cnd$haystack_arg}` ")
+  } else {
+    haystack_name <- " "
+  }
+
+  if (nzchar(cnd$needles_arg)) {
+    needles_name <- glue::glue(" by `{cnd$needles_arg}`")
+  } else {
+    needles_name <- ""
+  }
+
+  glue::glue("Each haystack value{haystack_name}must be matched{needles_name}.")
+}
+
+#' @export
+cnd_body.vctrs_error_matches_remaining <- function(cnd, ...) {
+  bullet <- glue::glue("The value at location {cnd$i} was not matched.")
   bullet <- c(x = bullet)
   format_error_bullets(bullet)
 }

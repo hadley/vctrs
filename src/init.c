@@ -137,7 +137,7 @@ extern r_obj* vctrs_rank(r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*)
 extern r_obj* vctrs_integer64_proxy(r_obj*);
 extern r_obj* vctrs_integer64_restore(r_obj*);
 extern r_obj* vctrs_test_compute_nested_containment_info(r_obj*, r_obj*, r_obj*);
-extern r_obj* vctrs_matches(r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*);
+extern r_obj* vctrs_matches(r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*, r_obj*);
 
 
 // Maturing
@@ -293,7 +293,7 @@ static const R_CallMethodDef CallEntries[] = {
   {"vctrs_integer64_proxy",                        (DL_FUNC) &vctrs_integer64_proxy, 1},
   {"vctrs_integer64_restore",                      (DL_FUNC) &vctrs_integer64_restore, 1},
   {"vctrs_test_compute_nested_containment_info",   (DL_FUNC) &vctrs_test_compute_nested_containment_info, 3},
-  {"vctrs_matches",                                (DL_FUNC) &vctrs_matches, 11},
+  {"vctrs_matches",                                (DL_FUNC) &vctrs_matches, 12},
   {NULL, NULL, 0}
 };
 

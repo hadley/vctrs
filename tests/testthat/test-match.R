@@ -652,6 +652,65 @@ test_that("`no_match` is validated", {
 })
 
 # ------------------------------------------------------------------------------
+# vec_matches() - `remaining`
+
+test_that("`remaining` can retain `haystack` values that `needles` didn't match", {
+  res <- vec_matches(1, 0:2, remaining = NA_integer_)
+  expect_identical(res$needles, c(1L, NA, NA))
+  expect_identical(res$haystack, c(2L, 1L, 3L))
+
+  res <- vec_matches(1, 0:2, remaining = NA_integer_, condition = ">=")
+  expect_identical(res$needles, c(1L, 1L, NA))
+  expect_identical(res$haystack, c(1L, 2L, 3L))
+
+  res <- vec_matches(1, 0:2, remaining = NA_integer_, condition = "<")
+  expect_identical(res$needles, c(1L, NA, NA))
+  expect_identical(res$haystack, c(3L, 1L, 2L))
+})
+
+test_that("`missing` affects `needles` but not `haystack`", {
+  # Matches NA to NA, so nothing remaining
+  res <- vec_matches(c(1, NA), c(NA, 1), missing = "match", remaining = NA_integer_)
+  expect_identical(res$needles, c(1L, 2L))
+  expect_identical(res$haystack, c(2L, 1L))
+
+  # `needles` NA value is propagated, so `haystack` is left with a remaining value
+  res <- vec_matches(c(1, NA), c(NA, 1), missing = "propagate", remaining = NA_integer_)
+  expect_identical(res$needles, c(1L, 2L, NA))
+  expect_identical(res$haystack, c(2L, NA, 1L))
+
+  # `needles` NA value is dropped, so `haystack` is left with a remaining value
+  res <- vec_matches(c(1, NA), c(NA, 1), missing = "drop", remaining = NA_integer_)
+  expect_identical(res$needles, c(1L, NA))
+  expect_identical(res$haystack, c(2L, 1L))
+})
+
+test_that("`remaining` works with `condition = NULL` and empty `needles`", {
+  res <- vec_matches(integer(), 1:5, condition = NULL, remaining = NA_integer_)
+  expect_identical(res$needles, rep(NA_integer_, 5))
+  expect_identical(res$haystack, 1:5)
+})
+
+test_that("`remaining` can error informatively", {
+  verify_output(test_path("error", "test-matches-remaining.txt"), {
+    "# default message"
+    vec_matches(1, 2, remaining = "error")
+
+    "# can control arg names"
+    vec_matches(1, 2, remaining = "error", needles_arg = "foo")
+    vec_matches(1, 2, remaining = "error", needles_arg = "foo", haystack_arg = "bar")
+
+    "# with `condition = NULL`"
+    vec_matches(double(), c(1, 2), remaining = "error", condition = NULL)
+  })
+})
+
+test_that("`remaining` is validated", {
+  expect_error(vec_matches(1, 2, remaining = 1.5), "length 1 integer, \"drop\", or \"error\"")
+  expect_error(vec_matches(1, 2, remaining = c(1L, 2L)), "length 1 integer, \"drop\", or \"error\"")
+})
+
+# ------------------------------------------------------------------------------
 # vec_matches() - filter
 
 test_that("simple `filter`s work", {

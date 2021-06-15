@@ -61,13 +61,15 @@ r_obj* vctrs_matches(r_obj* needles,
                      r_obj* filter,
                      r_obj* missing,
                      r_obj* no_match,
+                     r_obj* remaining,
                      r_obj* multiple,
                      r_obj* nan_distinct,
                      r_obj* chr_transform,
                      r_obj* needles_arg,
                      r_obj* haystack_arg) {
   enum vctrs_missing_needle c_missing = parse_missing(missing);
-  const struct vctrs_no_match c_no_match = parse_no_match(no_match);
+  const struct vctrs_no_match c_no_match = parse_no_match(no_match, "no_match");
+  const struct vctrs_no_match c_remaining = parse_no_match(remaining, "remaining");
   enum vctrs_multiple c_multiple = parse_multiple(multiple);
 
   if (!r_is_bool(nan_distinct)) {
@@ -85,6 +87,7 @@ r_obj* vctrs_matches(r_obj* needles,
     filter,
     c_missing,
     &c_no_match,
+    &c_remaining,
     c_multiple,
     c_nan_distinct,
     chr_transform,
@@ -100,6 +103,7 @@ r_obj* vec_matches(r_obj* needles,
                    r_obj* filter,
                    enum vctrs_missing_needle missing,
                    const struct vctrs_no_match* no_match,
+                   const struct vctrs_no_match* remaining,
                    enum vctrs_multiple multiple,
                    bool nan_distinct,
                    r_obj* chr_transform,
@@ -161,6 +165,7 @@ r_obj* vec_matches(r_obj* needles,
       size_haystack,
       multiple,
       no_match,
+      remaining,
       needles_arg,
       haystack_arg
     );
@@ -221,6 +226,7 @@ r_obj* vec_matches(r_obj* needles,
     missing,
     missing_propagate,
     no_match,
+    remaining,
     multiple,
     any_filters,
     v_filters,
@@ -245,6 +251,7 @@ r_obj* df_matches(r_obj* needles,
                   enum vctrs_missing_needle missing,
                   bool missing_propagate,
                   const struct vctrs_no_match* no_match,
+                  const struct vctrs_no_match* remaining,
                   enum vctrs_multiple multiple,
                   bool any_filters,
                   const enum vctrs_filter* v_filters,
@@ -436,8 +443,10 @@ r_obj* df_matches(r_obj* needles,
     missing,
     missing_propagate,
     no_match,
+    remaining,
     multiple,
     size_needles,
+    size_haystack,
     any_directional,
     has_locs_filter_match_haystack,
     v_filters,
@@ -1426,7 +1435,7 @@ void parse_filter(r_obj* filter,
 // -----------------------------------------------------------------------------
 
 static inline
-struct vctrs_no_match parse_no_match(r_obj* no_match) {
+struct vctrs_no_match parse_no_match(r_obj* no_match, const char* arg) {
   if (r_is_string(no_match)) {
     const char* c_no_match = r_chr_get_c_string(no_match, 0);
 
@@ -1457,7 +1466,7 @@ struct vctrs_no_match parse_no_match(r_obj* no_match) {
     };
   }
 
-  r_abort("`no_match` must be a length 1 integer, \"drop\", or \"error\".");
+  r_abort("`%s` must be a length 1 integer, \"drop\", or \"error\".", arg);
 }
 
 // -----------------------------------------------------------------------------
@@ -1501,6 +1510,7 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
                                r_ssize size_haystack,
                                enum vctrs_multiple multiple,
                                const struct vctrs_no_match* no_match,
+                               const struct vctrs_no_match* remaining,
                                struct vctrs_arg* needles_arg,
                                struct vctrs_arg* haystack_arg) {
   if (size_haystack == 0) {
@@ -1525,6 +1535,33 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
     for (r_ssize i = 0; i < size_out; ++i) {
       v_out_needles[loc_out] = i + 1;
       v_out_haystack[loc_out] = loc_haystack;
+      ++loc_out;
+    }
+
+    FREE(1);
+    return out;
+  }
+
+  if (size_needles == 0 && !remaining->drop) {
+    // Handle empty `needles` up front
+    // All elements of `haystack` are "remaining"
+
+    if (remaining->error) {
+      stop_matches_remaining(0, needles_arg, haystack_arg);
+    }
+
+    const r_ssize size_out = size_haystack;
+
+    r_obj* out = KEEP(new_vec_matches_result(size_out));
+    int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
+    int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
+    r_ssize loc_out = 0;
+
+    const int loc_needles = remaining->value;
+
+    for (r_ssize i = 0; i < size_out; ++i) {
+      v_out_needles[loc_out] = loc_needles;
+      v_out_haystack[loc_out] = i + 1;
       ++loc_out;
     }
 
@@ -1594,8 +1631,10 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               enum vctrs_missing_needle missing,
                               bool missing_propagate,
                               const struct vctrs_no_match* no_match,
+                              const struct vctrs_no_match* remaining,
                               enum vctrs_multiple multiple,
                               r_ssize size_needles,
+                              r_ssize size_haystack,
                               bool any_directional,
                               bool has_locs_filter_match_haystack,
                               const enum vctrs_filter* v_filters,
@@ -1603,6 +1642,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               const struct poly_df_data* p_haystack,
                               struct vctrs_arg* needles_arg,
                               struct vctrs_arg* haystack_arg) {
+  int n_prot = 0;
+
   const r_ssize n_used = p_locs_start_o_haystack->count;
 
   const int* v_locs_start_o_haystack = (const int*) r_arr_cbegin(p_locs_start_o_haystack);
@@ -1636,7 +1677,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     size_out = (r_ssize) dbl_size_out;
   }
 
-  r_obj* out = KEEP(new_vec_matches_result(size_out));
+  r_obj* out = KEEP_N(new_vec_matches_result(size_out), &n_prot);
 
   r_obj* out_needles = r_list_get(out, MATCHES_DF_LOCS_needles);
   r_obj* out_haystack = r_list_get(out, MATCHES_DF_LOCS_haystack);
@@ -1644,14 +1685,24 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
   int* v_out_needles = r_int_begin(out_needles);
   int* v_out_haystack = r_int_begin(out_haystack);
 
-  r_obj* o_locs_needles = vctrs_shared_empty_int;
+  const int* v_o_locs_needles = NULL;
   if (!skip_locs_needles) {
-    r_obj* locs_needles = KEEP(r_arr_unwrap(p_locs_needles));
-    o_locs_needles = vec_order(locs_needles, chrs_asc, chrs_smallest, true, r_null);
-    FREE(1);
+    r_obj* locs_needles = KEEP_N(r_arr_unwrap(p_locs_needles), &n_prot);
+    r_obj* o_locs_needles = KEEP_N(vec_order(locs_needles, chrs_asc, chrs_smallest, true, r_null), &n_prot);
+    v_o_locs_needles = r_int_cbegin(o_locs_needles);
   }
-  KEEP(o_locs_needles);
-  const int* v_o_locs_needles = r_int_cbegin(o_locs_needles);
+
+  const bool has_no_match_haystack = !remaining->drop;
+  int* v_detect_no_match_haystack = NULL;
+  if (has_no_match_haystack) {
+    r_obj* detect_no_match_haystack = KEEP_N(r_alloc_integer(size_haystack), &n_prot);
+    v_detect_no_match_haystack = r_int_begin(detect_no_match_haystack);
+
+    for (r_ssize i = 0; i < size_haystack; ++i) {
+      // Initialize to no-match
+      v_detect_no_match_haystack[i] = 1;
+    }
+  }
 
   r_ssize loc_out = 0;
 
@@ -1763,6 +1814,10 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
       v_out_needles[loc_out] = loc_needles;
       v_out_haystack[loc_out] = loc_haystack;
 
+      if (has_no_match_haystack) {
+        v_detect_no_match_haystack[loc_haystack - 1] = 0;
+      }
+
       ++loc_out;
       ++loc_start_o_haystack;
     }
@@ -1806,7 +1861,42 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     FREE(2);
   }
 
-  FREE(2);
+  if (has_no_match_haystack) {
+    r_ssize n_no_match_haystack = 0;
+
+    for (r_ssize i = 0; i < size_haystack; ++i) {
+      if (v_detect_no_match_haystack[i]) {
+        if (remaining->error) {
+          stop_matches_remaining(i, needles_arg, haystack_arg);
+        }
+
+        // Overwrite with location, this moves all no-match locs up to the front
+        v_detect_no_match_haystack[n_no_match_haystack] = i + 1;
+        ++n_no_match_haystack;
+      }
+    }
+
+    if (n_no_match_haystack > 0) {
+      // Resize to have enough room for haystack no-matches at the end
+      r_ssize new_size_out = r_ssize_add(size_out, n_no_match_haystack);
+      r_init_data_frame(out, new_size_out);
+      out_needles = r_int_resize(out_needles, new_size_out);
+      r_list_poke(out, MATCHES_DF_LOCS_needles, out_needles);
+      out_haystack = r_int_resize(out_haystack, new_size_out);
+      r_list_poke(out, MATCHES_DF_LOCS_haystack, out_haystack);
+      v_out_needles = r_int_begin(out_needles);
+      v_out_haystack = r_int_begin(out_haystack);
+
+      for (r_ssize i = size_out, j = 0; i < new_size_out; ++i, ++j) {
+        v_out_needles[i] = remaining->value;
+        v_out_haystack[i] = v_detect_no_match_haystack[j];
+      }
+
+      size_out = new_size_out;
+    }
+  }
+
+  FREE(n_prot);
   return out;
 }
 
@@ -2282,6 +2372,29 @@ void stop_matches_nothing(r_ssize i,
   Rf_eval(call, vctrs_ns_env);
 
   never_reached("stop_matches_nothing");
+}
+
+static inline
+void stop_matches_remaining(r_ssize i,
+                            struct vctrs_arg* needles_arg,
+                            struct vctrs_arg* haystack_arg) {
+  r_obj* syms[4] = {
+    syms_i,
+    syms_needles_arg,
+    syms_haystack_arg,
+    NULL
+  };
+  r_obj* args[4] = {
+    KEEP(r_int((int)i + 1)),
+    KEEP(vctrs_arg(needles_arg)),
+    KEEP(vctrs_arg(haystack_arg)),
+    NULL
+  };
+
+  r_obj* call = KEEP(r_call_n(syms_stop_matches_remaining, syms, args));
+  Rf_eval(call, vctrs_ns_env);
+
+  never_reached("stop_matches_remaining");
 }
 
 static inline
