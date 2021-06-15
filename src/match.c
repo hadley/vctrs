@@ -2,6 +2,7 @@
 #include "vctrs.h"
 #include "utils.h"
 #include "rank.h"
+#include "complete.h"
 #include "poly-op.h"
 #include "compare.h"
 #include "ptype2.h"
@@ -1270,16 +1271,17 @@ r_obj* df_missings_by_col(r_obj* x, r_ssize x_size, r_ssize n_cols) {
   for (r_ssize i = 0; i < n_cols; ++i) {
     r_obj* col = v_x[i];
 
-    r_obj* missing = vec_equal_na(col);
-    r_list_poke(out, i, missing);
-    int* v_missing = r_lgl_begin(missing);
+    // Use completeness to match `vec_rank()` and `vec_match()`
+    r_obj* complete = vec_detect_complete(col);
+    r_list_poke(out, i, complete);
+    int* v_complete = r_lgl_begin(complete);
 
-    // Flip any TRUE to NA_integer_ to align with propagated integer NAs in
+    // Flip any `FALSE` to `NA_integer_` to align with propagated integer NAs in
     // `x` ranks when `missing_propagate = true`.
     // Relies on the fact that logical and integer are the same type internally.
     for (r_ssize j = 0; j < x_size; ++j) {
-      if (v_missing[j]) {
-        v_missing[j] = r_globals.na_int;
+      if (!v_complete[j]) {
+        v_complete[j] = r_globals.na_int;
       }
     }
   }

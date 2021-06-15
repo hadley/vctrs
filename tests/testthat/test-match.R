@@ -240,18 +240,21 @@ test_that("ensure that matching works if outer runs are present (i.e. `==` comes
   expect_identical(res$haystack, c(1L, NA, 2L, 1L))
 })
 
-test_that("df-cols must be entirely missing to propagate missingness", {
-  df1 <- data_frame(x = 1, y = data_frame(x = NA, y = c(NA, 2)))
-  df2 <- data_frame(x = 1, y = data_frame(x = NA, y = c(NA, 2)))
+test_that("df-cols propagate an NA if any columns are incomplete", {
+  df <- data_frame(x = 1, y = data_frame(x = c(1, 1, NA), y = c(1, NA, 2)))
 
-  res <- vec_matches(df1, df2, missing = "match")
-  expect_identical(res$needles, 1:2)
-  expect_identical(res$haystack, 1:2)
+  res <- vec_matches(df, df, missing = "match")
+  expect_identical(res$needles, 1:3)
+  expect_identical(res$haystack, 1:3)
 
-  # 2nd row isn't completely missing, so it still matches
-  res <- vec_matches(df1, df2, missing = "propagate")
-  expect_identical(res$needles, 1:2)
-  expect_identical(res$haystack, c(NA, 2L))
+  # 2nd and 3rd rows aren't fully complete, so their missing values propagate
+  res <- vec_matches(df, df, missing = "propagate")
+  expect_identical(res$needles, 1:3)
+  expect_identical(res$haystack, c(1L, NA, NA))
+
+  res <- vec_matches(df, df, missing = "drop")
+  expect_identical(res$needles, 1L)
+  expect_identical(res$haystack, 1L)
 })
 
 # ------------------------------------------------------------------------------
@@ -270,7 +273,7 @@ test_that("rcrd types can be matched", {
   expect_identical(res$haystack, c(NA, 1L, 2L))
 })
 
-test_that("rcrd type missingness can be propagated", {
+test_that("rcrd type missingness is propagated correctly", {
   x <- new_rcrd(list(x = c(1L, NA), y = c(NA_integer_, NA_integer_)))
   y <- new_rcrd(list(x = c(1L, 2L, NA), y = c(NA, 5L, NA)))
 
@@ -278,6 +281,7 @@ test_that("rcrd type missingness can be propagated", {
   expect_identical(res$needles, c(1L, 2L))
   expect_identical(res$haystack, c(1L, 3L))
 
+  # Only the observation where all fields are NA is considered incomplete
   res <- vec_matches(x, y, condition = "==", missing = "propagate")
   expect_identical(res$needles, c(1L, 2L))
   expect_identical(res$haystack, c(1L, NA))
