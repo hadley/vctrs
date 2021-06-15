@@ -31,6 +31,13 @@ enum vctrs_ops {
   VCTRS_OPS_lte = 4
 };
 
+enum vctrs_missing_needle {
+  VCTRS_MISSING_NEEDLE_match = 0,
+  VCTRS_MISSING_NEEDLE_propagate = 1,
+  VCTRS_MISSING_NEEDLE_drop = 2,
+  VCTRS_MISSING_NEEDLE_error = 3
+};
+
 struct vctrs_no_match {
   bool error;
   bool drop;
@@ -51,19 +58,16 @@ r_obj* vctrs_matches(r_obj* needles,
                      r_obj* haystack,
                      r_obj* condition,
                      r_obj* filter,
-                     r_obj* na_equal,
+                     r_obj* missing,
                      r_obj* no_match,
                      r_obj* multiple,
                      r_obj* nan_distinct,
                      r_obj* chr_transform,
                      r_obj* needles_arg,
                      r_obj* haystack_arg) {
-  if (!r_is_bool(na_equal)) {
-    r_abort("`na_equal` must be a single `TRUE` or `FALSE`.");
-  }
-  bool c_na_equal = r_as_bool(na_equal);
-
+  enum vctrs_missing_needle c_missing = parse_missing(missing);
   const struct vctrs_no_match c_no_match = parse_no_match(no_match);
+  enum vctrs_multiple c_multiple = parse_multiple(multiple);
 
   if (!r_is_bool(nan_distinct)) {
     r_abort("`nan_distinct` must be a single `TRUE` or `FALSE`.");
@@ -73,14 +77,12 @@ r_obj* vctrs_matches(r_obj* needles,
   struct vctrs_arg c_needles_arg = vec_as_arg(needles_arg);
   struct vctrs_arg c_haystack_arg = vec_as_arg(haystack_arg);
 
-  enum vctrs_multiple c_multiple = parse_multiple(multiple);
-
   return vec_matches(
     needles,
     haystack,
     condition,
     filter,
-    c_na_equal,
+    c_missing,
     &c_no_match,
     c_multiple,
     c_nan_distinct,
@@ -95,7 +97,7 @@ r_obj* vec_matches(r_obj* needles,
                    r_obj* haystack,
                    r_obj* condition,
                    r_obj* filter,
-                   bool na_equal,
+                   enum vctrs_missing_needle missing,
                    const struct vctrs_no_match* no_match,
                    enum vctrs_multiple multiple,
                    bool nan_distinct,
@@ -180,14 +182,17 @@ r_obj* vec_matches(r_obj* needles,
     r_abort("Must have at least 1 column to match on unless `condition = NULL`.");
   }
 
-  bool na_propagate = !na_equal;
+  const bool missing_propagate =
+    missing == VCTRS_MISSING_NEEDLE_propagate ||
+    missing == VCTRS_MISSING_NEEDLE_drop ||
+    missing == VCTRS_MISSING_NEEDLE_error;
 
   // Compute the locations of missing values for each column if computing ranks
   // later on is going to replace the missing values with integer ranks
-  r_obj* needles_missings = na_propagate ? r_null : df_missings_by_col(needles, size_needles, n_cols);
+  r_obj* needles_missings = missing_propagate ? r_null : df_missings_by_col(needles, size_needles, n_cols);
   KEEP_N(needles_missings, &n_prot);
 
-  r_obj* haystack_missings = na_propagate ? r_null : df_missings_by_col(haystack, size_haystack, n_cols);
+  r_obj* haystack_missings = missing_propagate ? r_null : df_missings_by_col(haystack, size_haystack, n_cols);
   KEEP_N(haystack_missings, &n_prot);
 
   // Compute joint ranks to simplify each column down to an integer vector
@@ -198,7 +203,7 @@ r_obj* vec_matches(r_obj* needles,
     size_haystack,
     n_cols,
     ptype,
-    na_propagate,
+    missing_propagate,
     nan_distinct,
     chr_transform
   ), &n_prot);
@@ -212,7 +217,8 @@ r_obj* vec_matches(r_obj* needles,
     haystack_missings,
     size_needles,
     size_haystack,
-    na_equal,
+    missing,
+    missing_propagate,
     no_match,
     multiple,
     any_filters,
@@ -235,7 +241,8 @@ r_obj* df_matches(r_obj* needles,
                   r_obj* haystack_missings,
                   r_ssize size_needles,
                   r_ssize size_haystack,
-                  bool na_equal,
+                  enum vctrs_missing_needle missing,
+                  bool missing_propagate,
                   const struct vctrs_no_match* no_match,
                   enum vctrs_multiple multiple,
                   bool any_filters,
@@ -339,7 +346,11 @@ r_obj* df_matches(r_obj* needles,
   const struct poly_df_data* p_needles_missings;
   const struct poly_df_data* p_haystack_missings;
 
-  if (na_equal) {
+  if (missing_propagate) {
+    // NAs propagated through the ranks, so we can use them directly
+    p_needles_missings = p_needles;
+    p_haystack_missings = p_haystack;
+  } else {
     // NAs were removed from the ranks, so grab them from the "missing" data frames
     struct poly_vec* p_poly_needles_missings = new_poly_vec(needles_missings, vctrs_type_dataframe);
     PROTECT_POLY_VEC(p_poly_needles_missings, &n_prot);
@@ -348,10 +359,6 @@ r_obj* df_matches(r_obj* needles,
     struct poly_vec* p_poly_haystack_missings = new_poly_vec(haystack_missings, vctrs_type_dataframe);
     PROTECT_POLY_VEC(p_poly_haystack_missings, &n_prot);
     p_haystack_missings = (const struct poly_df_data*) p_poly_haystack_missings->p_vec;
-  } else {
-    // NAs propagated through the ranks, so we can use them directly
-    p_needles_missings = p_needles;
-    p_haystack_missings = p_haystack;
   }
 
   r_ssize n_extra = 0;
@@ -381,7 +388,7 @@ r_obj* df_matches(r_obj* needles,
         p_haystack_missings,
         v_o_needles,
         v_o_haystack,
-        na_equal,
+        missing_propagate,
         multiple,
         any_filters,
         v_filters,
@@ -406,7 +413,7 @@ r_obj* df_matches(r_obj* needles,
         p_haystack_missings,
         v_o_needles,
         v_o_haystack,
-        na_equal,
+        missing_propagate,
         multiple,
         any_filters,
         v_filters,
@@ -427,7 +434,8 @@ r_obj* df_matches(r_obj* needles,
     p_locs_needles,
     skip_match_sizes,
     skip_locs_needles,
-    na_equal,
+    missing,
+    missing_propagate,
     no_match,
     multiple,
     size_needles,
@@ -458,7 +466,7 @@ void df_matches_recurse(r_ssize col,
                         const struct poly_df_data* p_haystack_missings,
                         const int* v_o_needles,
                         const int* v_o_haystack,
-                        bool na_equal,
+                        bool missing_propagate,
                         enum vctrs_multiple multiple,
                         bool any_filters,
                         const enum vctrs_filter* v_filters,
@@ -503,7 +511,7 @@ void df_matches_recurse(r_ssize col,
     loc_group_upper_o_needles
   );
 
-  if (!na_equal && needle_is_missing) {
+  if (missing_propagate && needle_is_missing) {
     // Propagate NA, don't recursive into further columns.
     for (r_ssize i = loc_group_lower_o_needles; i <= loc_group_upper_o_needles; ++i) {
       // Will always be the first and only time the output is touched for this
@@ -531,7 +539,7 @@ void df_matches_recurse(r_ssize col,
         p_haystack_missings,
         v_o_needles,
         v_o_haystack,
-        na_equal,
+        missing_propagate,
         multiple,
         any_filters,
         v_filters,
@@ -558,7 +566,7 @@ void df_matches_recurse(r_ssize col,
         p_haystack_missings,
         v_o_needles,
         v_o_haystack,
-        na_equal,
+        missing_propagate,
         multiple,
         any_filters,
         v_filters,
@@ -750,7 +758,7 @@ void df_matches_recurse(r_ssize col,
         p_haystack_missings,
         v_o_needles,
         v_o_haystack,
-        na_equal,
+        missing_propagate,
         multiple,
         any_filters,
         v_filters,
@@ -891,7 +899,7 @@ void df_matches_recurse(r_ssize col,
         }
       }
     }
-  } else if (!na_equal && col < n_col - 1) {
+  } else if (missing_propagate && col < n_col - 1) {
     // Miss! This `needles` column group has no matches in the corresponding
     // `haystack` column. However, we still need to propagate any potential
     // NAs that might occur in future columns of this `needles` group. If
@@ -979,7 +987,7 @@ void df_matches_recurse(r_ssize col,
       p_haystack_missings,
       v_o_needles,
       v_o_haystack,
-      na_equal,
+      missing_propagate,
       multiple,
       any_filters,
       v_filters,
@@ -1004,7 +1012,7 @@ void df_matches_recurse(r_ssize col,
       p_haystack_missings,
       v_o_needles,
       v_o_haystack,
-      na_equal,
+      missing_propagate,
       multiple,
       any_filters,
       v_filters,
@@ -1033,7 +1041,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    const struct poly_df_data* p_haystack_missings,
                                    const int* v_o_needles,
                                    const int* v_o_haystack,
-                                   bool na_equal,
+                                   bool missing_propagate,
                                    enum vctrs_multiple multiple,
                                    bool any_filters,
                                    const enum vctrs_filter* v_filters,
@@ -1095,7 +1103,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
       p_haystack_missings,
       v_o_needles,
       v_o_haystack,
-      na_equal,
+      missing_propagate,
       multiple,
       any_filters,
       v_filters,
@@ -1267,7 +1275,7 @@ r_obj* df_missings_by_col(r_obj* x, r_ssize x_size, r_ssize n_cols) {
     int* v_missing = r_lgl_begin(missing);
 
     // Flip any TRUE to NA_integer_ to align with propagated integer NAs in
-    // `x` ranks when `na_equal = FALSE`.
+    // `x` ranks when `missing_propagate = true`.
     // Relies on the fact that logical and integer are the same type internally.
     for (r_ssize j = 0; j < x_size; ++j) {
       if (v_missing[j]) {
@@ -1319,6 +1327,24 @@ void parse_condition(r_obj* condition, enum vctrs_ops* v_ops, r_ssize n_cols) {
       "length as the number of columns of the input."
     );
   }
+}
+
+// -----------------------------------------------------------------------------
+
+static inline
+enum vctrs_missing_needle parse_missing(r_obj* missing) {
+  if (!r_is_string(missing)) {
+    r_abort("`missing` must be a string.");
+  }
+
+  const char* c_missing = r_chr_get_c_string(missing, 0);
+
+  if (!strcmp(c_missing, "match")) return VCTRS_MISSING_NEEDLE_match;
+  if (!strcmp(c_missing, "propagate")) return VCTRS_MISSING_NEEDLE_propagate;
+  if (!strcmp(c_missing, "drop")) return VCTRS_MISSING_NEEDLE_drop;
+  if (!strcmp(c_missing, "error")) return VCTRS_MISSING_NEEDLE_error;
+
+  r_abort("`missing` must be one of \"match\", \"propagate\", \"drop\", or \"error\".");
 }
 
 // -----------------------------------------------------------------------------
@@ -1561,7 +1587,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_locs_needles,
                               bool skip_match_sizes,
                               bool skip_locs_needles,
-                              bool na_equal,
+                              enum vctrs_missing_needle missing,
+                              bool missing_propagate,
                               const struct vctrs_no_match* no_match,
                               enum vctrs_multiple multiple,
                               r_ssize size_needles,
@@ -1586,7 +1613,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
       // TODO: Check for overflow?
       // This could get extremely large with improperly specified non-equi joins.
       // May over-allocate in the case of `filters` with `multiple = "all"`,
-      // or when `no_match = "drop"`.
+      // or when `no_match = "drop"` or `missing = "drop"`.
       size_out += (r_ssize) v_match_sizes[i];
     }
   }
@@ -1623,7 +1650,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     const int match_size = skip_match_sizes ? 1 : v_match_sizes[loc];
     const int loc_needles = skip_locs_needles ? loc + 1 : v_locs_needles[loc];
 
-    if (!na_equal && loc_start_o_haystack == SIGNAL_NA_PROPAGATE) {
+    if (missing_propagate && loc_start_o_haystack == SIGNAL_NA_PROPAGATE) {
       if (match_size != 1) {
         r_stop_internal(
           "expand_compact_indices",
@@ -1631,9 +1658,28 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
         );
       }
 
-      v_out_needles[loc_out] = loc_needles;
-      v_out_haystack[loc_out] = r_globals.na_int;
-      ++loc_out;
+      switch (missing) {
+      case VCTRS_MISSING_NEEDLE_propagate: {
+        v_out_needles[loc_out] = loc_needles;
+        v_out_haystack[loc_out] = r_globals.na_int;
+        ++loc_out;
+        break;
+      }
+      case VCTRS_MISSING_NEEDLE_drop: {
+        // Do not increment `loc_out`, do not store locations
+        break;
+      }
+      case VCTRS_MISSING_NEEDLE_error: {
+        stop_matches_missing(loc_needles - 1, needles_arg);
+      }
+      case VCTRS_MISSING_NEEDLE_match: {
+        r_stop_internal(
+          "expand_compact_indices",
+          "Needles should never be marked as `SIGNAL_NA_PROPAGATE` when `missing = 'match'."
+        );
+      }
+      }
+
       continue;
     }
 
@@ -1708,7 +1754,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     // Can happen with a `filter` and `multiple = "all"`, where it is possible
     // for potential matches coming from a different nested containment group
     // to be filtered out in the above loop.
-    // Can also happen with `no_match = "drop"` if there any unmatched needles.
+    // Can also happen with `no_match = "drop"` or `missing = "drop"`.
     size_out = loc_out;
     r_init_data_frame(out, size_out);
     r_list_poke(out, MATCHES_DF_LOCS_needles, r_int_resize(out_needles, size_out));
@@ -2203,6 +2249,25 @@ void stop_matches_nothing(r_ssize i,
   Rf_eval(call, vctrs_ns_env);
 
   never_reached("stop_matches_nothing");
+}
+
+static inline
+void stop_matches_missing(r_ssize i, struct vctrs_arg* needles_arg) {
+  r_obj* syms[3] = {
+    syms_i,
+    syms_needles_arg,
+    NULL
+  };
+  r_obj* args[3] = {
+    KEEP(r_int((int)i + 1)),
+    KEEP(vctrs_arg(needles_arg)),
+    NULL
+  };
+
+  r_obj* call = KEEP(r_call_n(syms_stop_matches_missing, syms, args));
+  Rf_eval(call, vctrs_ns_env);
+
+  never_reached("stop_matches_missing");
 }
 
 static inline

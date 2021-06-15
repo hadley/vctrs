@@ -3,7 +3,7 @@ r_obj* vec_matches(r_obj* needles,
                    r_obj* haystack,
                    r_obj* condition,
                    r_obj* filter,
-                   bool na_equal,
+                   enum vctrs_missing_needle missing,
                    const struct vctrs_no_match* no_match,
                    enum vctrs_multiple multiple,
                    bool nan_distinct,
@@ -18,7 +18,8 @@ r_obj* df_matches(r_obj* needles,
                   r_obj* haystack_missings,
                   r_ssize size_needles,
                   r_ssize size_haystack,
-                  bool na_equal,
+                  enum vctrs_missing_needle missing,
+                  bool missing_propagate,
                   const struct vctrs_no_match* no_match,
                   enum vctrs_multiple multiple,
                   bool any_filters,
@@ -39,7 +40,7 @@ void df_matches_recurse(r_ssize col,
                         const struct poly_df_data* p_haystack_missings,
                         const int* v_o_needles,
                         const int* v_o_haystack,
-                        bool na_equal,
+                        bool missing_propagate,
                         enum vctrs_multiple multiple,
                         bool any_filters,
                         const enum vctrs_filter* v_filters,
@@ -63,7 +64,7 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    const struct poly_df_data* p_haystack_missings,
                                    const int* v_o_needles,
                                    const int* v_o_haystack,
-                                   bool na_equal,
+                                   bool missing_propagate,
                                    enum vctrs_multiple multiple,
                                    bool any_filters,
                                    const enum vctrs_filter* v_filters,
@@ -113,6 +114,9 @@ static inline
 struct vctrs_no_match parse_no_match(r_obj* no_match);
 
 static inline
+enum vctrs_missing_needle parse_missing(r_obj* missing);
+
+static inline
 enum vctrs_multiple parse_multiple(r_obj* multiple);
 
 static inline
@@ -136,7 +140,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
                               struct r_dyn_array* p_locs_needles,
                               bool skip_match_sizes,
                               bool skip_locs_needles,
-                              bool na_equal,
+                              enum vctrs_missing_needle missing,
+                              bool missing_propagate,
                               const struct vctrs_no_match* no_match,
                               enum vctrs_multiple multiple,
                               r_ssize size_needles,
@@ -187,6 +192,9 @@ static inline
 void stop_matches_nothing(r_ssize i,
                           struct vctrs_arg* needles_arg,
                           struct vctrs_arg* haystack_arg);
+
+static inline
+void stop_matches_missing(r_ssize i, struct vctrs_arg* needles_arg);
 
 static inline
 void stop_matches_multiple(r_ssize i,
