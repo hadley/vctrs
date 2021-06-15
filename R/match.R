@@ -81,6 +81,8 @@
 #'   - If a single integer is provided, this represents the value returned in
 #'     the `haystack` column for observations of `needles` that have zero
 #'     matches. The default represents an unmatched needle with `NA`.
+#'   - If `"drop"`, `needles` with zero matches are completely dropped from
+#'     the result.
 #'   - If `"error"`, an error will be thrown if any `needles` have zero matches.
 #'
 #' @param multiple Handling of `needles` with multiple matches. For each needle:

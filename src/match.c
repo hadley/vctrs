@@ -33,6 +33,7 @@ enum vctrs_ops {
 
 struct vctrs_no_match {
   bool error;
+  bool drop;
   int value;
 };
 
@@ -1404,16 +1405,33 @@ struct vctrs_no_match parse_no_match(r_obj* no_match) {
     const char* c_no_match = r_chr_get_c_string(no_match, 0);
 
     if (!strcmp(c_no_match, "error")) {
-      return (struct vctrs_no_match) {true, SIGNAL_NO_MATCH};
+      return (struct vctrs_no_match) {
+        .error = true,
+        .drop = false,
+        .value = SIGNAL_NO_MATCH
+      };
+    }
+
+    if (!strcmp(c_no_match, "drop")) {
+      return (struct vctrs_no_match) {
+        .error = false,
+        .drop = true,
+        .value = SIGNAL_NO_MATCH
+      };
     }
   }
 
   if (r_typeof(no_match) == R_TYPE_integer && r_length(no_match) == 1) {
     int c_no_match = r_int_get(no_match, 0);
-    return (struct vctrs_no_match) {false, c_no_match};
+
+    return (struct vctrs_no_match) {
+      .error = false,
+      .drop = false,
+      .value = c_no_match
+    };
   }
 
-  r_abort("`no_match` must be a length 1 integer, or \"error\".");
+  r_abort("`no_match` must be a length 1 integer, \"drop\", or \"error\".");
 }
 
 // -----------------------------------------------------------------------------
@@ -1467,14 +1485,18 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
       stop_matches_nothing(0, needles_arg, haystack_arg);
     }
 
-    r_obj* out = KEEP(new_vec_matches_result(size_needles));
+    // If `no_match = "drop"`, since everything is a no-match there are
+    // no results
+    const r_ssize size_out = no_match->drop ? 0 : size_needles;
+
+    r_obj* out = KEEP(new_vec_matches_result(size_out));
     int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
     int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
     r_ssize loc_out = 0;
 
     const int loc_haystack = no_match->value;
 
-    for (r_ssize i = 0; i < size_needles; ++i) {
+    for (r_ssize i = 0; i < size_out; ++i) {
       v_out_needles[loc_out] = i + 1;
       v_out_haystack[loc_out] = loc_haystack;
       ++loc_out;
@@ -1511,9 +1533,9 @@ r_obj* expand_match_on_nothing(r_ssize size_needles,
     }
   }
 
-  r_ssize size = r_ssize_mult(size_needles, size_haystack);
+  r_ssize size_out = r_ssize_mult(size_needles, size_haystack);
 
-  r_obj* out = KEEP(new_vec_matches_result(size));
+  r_obj* out = KEEP(new_vec_matches_result(size_out));
   int* v_out_needles = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_needles));
   int* v_out_haystack = r_int_begin(r_list_get(out, MATCHES_DF_LOCS_haystack));
   r_ssize loc_out = 0;
@@ -1563,7 +1585,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     for (r_ssize i = 0; i < n_used; ++i) {
       // TODO: Check for overflow?
       // This could get extremely large with improperly specified non-equi joins.
-      // May over-allocate in the case of `filters` with `multiple = "all"`.
+      // May over-allocate in the case of `filters` with `multiple = "all"`,
+      // or when `no_match = "drop"`.
       size_out += (r_ssize) v_match_sizes[i];
     }
   }
@@ -1624,6 +1647,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 
       if (no_match->error) {
         stop_matches_nothing(i, needles_arg, haystack_arg);
+      } else if (no_match->drop) {
+        continue;
       }
 
       v_out_needles[loc_out] = loc_needles;
@@ -1683,6 +1708,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     // Can happen with a `filter` and `multiple = "all"`, where it is possible
     // for potential matches coming from a different nested containment group
     // to be filtered out in the above loop.
+    // Can also happen with `no_match = "drop"` if there any unmatched needles.
     size_out = loc_out;
     r_init_data_frame(out, size_out);
     r_list_poke(out, MATCHES_DF_LOCS_needles, r_int_resize(out_needles, size_out));

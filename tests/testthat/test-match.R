@@ -554,6 +554,26 @@ test_that("can control `no_match`", {
   expect_identical(x$haystack, c(1L, 0L, 0L))
 })
 
+test_that("can drop unmatched needles", {
+  x <- vec_matches(1:3, 2L, no_match = "drop")
+  expect_identical(x$needles, 2L)
+  expect_identical(x$haystack, 1L)
+})
+
+test_that("can drop unmatched missings when not propagating them", {
+  x <- vec_matches(c(NaN, 2, NA), 2, no_match = "drop")
+  expect_identical(x$needles, 2L)
+  expect_identical(x$haystack, 1L)
+
+  x <- vec_matches(c(NaN, 2, NA), NA, no_match = "drop", nan_distinct = FALSE)
+  expect_identical(x$needles, c(1L, 3L))
+  expect_identical(x$haystack, c(1L, 1L))
+
+  x <- vec_matches(c(NaN, 2, NA), NA, no_match = "drop", nan_distinct = TRUE)
+  expect_identical(x$needles, 3L)
+  expect_identical(x$haystack, 1L)
+})
+
 test_that("can differentiate between `no_match` and propagated NAs", {
   res <- vec_matches(c(1, NA), 2, na_equal = FALSE, no_match = -1L)
 
@@ -582,9 +602,16 @@ test_that("`no_match = 'error'` passes propagated NAs through untouched", {
   expect_identical(res$haystack, c(rep(NA, 3), 2L))
 })
 
+test_that("`no_match = 'drop'` passes propagated NAs through untouched", {
+  res <- vec_matches(c(NA, NaN, NA, 1), c(NA, 1), na_equal = FALSE, no_match = "drop")
+
+  expect_identical(res$needles, 1:4)
+  expect_identical(res$haystack, c(rep(NA, 3), 2L))
+})
+
 test_that("`no_match` is validated", {
-  expect_error(vec_matches(1, 2, no_match = 1.5), "length 1 integer, or \"error\"")
-  expect_error(vec_matches(1, 2, no_match = c(1L, 2L)), "length 1 integer, or \"error\"")
+  expect_error(vec_matches(1, 2, no_match = 1.5), "length 1 integer, \"drop\", or \"error\"")
+  expect_error(vec_matches(1, 2, no_match = c(1L, 2L)), "length 1 integer, \"drop\", or \"error\"")
 })
 
 # ------------------------------------------------------------------------------
@@ -844,6 +871,13 @@ test_that("NA adjustment of `>` and `>=` conditions is protected from empty hays
   res <- vec_matches(1L, integer(), condition = ">")
   expect_identical(res$needles, 1L)
   expect_identical(res$haystack, NA_integer_)
+})
+
+test_that("`condition = NULL` works with `no_match = 'drop'`", {
+  # All needles are unmatched with an empty haystack
+  res <- vec_matches(1:2, integer(), condition = NULL, no_match = "drop")
+  expect_identical(res$needles, integer())
+  expect_identical(res$haystack, integer())
 })
 
 # ------------------------------------------------------------------------------
