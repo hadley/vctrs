@@ -691,6 +691,19 @@ test_that("`remaining` works with `condition = NULL` and empty `needles`", {
   expect_identical(res$haystack, 1:5)
 })
 
+test_that("`remaining` combined with `multiple = 'first/last'` treats non-first/last matches as remaining", {
+  x <- c(1, 2)
+  y <- c(1, 2, 2)
+
+  res <- vec_matches(x, y, remaining = NA_integer_, multiple = "first")
+  expect_identical(res$needles, c(1L, 2L, NA))
+  expect_identical(res$haystack, c(1L, 2L, 3L))
+
+  res <- vec_matches(x, y, remaining = NA_integer_, multiple = "last")
+  expect_identical(res$needles, c(1L, 2L, NA))
+  expect_identical(res$haystack, c(1L, 3L, 2L))
+})
+
 test_that("`remaining` can error informatively", {
   verify_output(test_path("error", "test-matches-remaining.txt"), {
     "# default message"
