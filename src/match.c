@@ -39,6 +39,13 @@ enum vctrs_missing_needle {
   VCTRS_MISSING_NEEDLE_error = 3
 };
 
+enum vctrs_unique {
+  VCTRS_UNIQUE_neither = 0,
+  VCTRS_UNIQUE_needles = 1,
+  VCTRS_UNIQUE_haystack = 2,
+  VCTRS_UNIQUE_both = 3
+};
+
 struct vctrs_no_match {
   bool error;
   bool drop;
@@ -63,6 +70,7 @@ r_obj* vctrs_matches(r_obj* needles,
                      r_obj* no_match,
                      r_obj* remaining,
                      r_obj* multiple,
+                     r_obj* unique,
                      r_obj* nan_distinct,
                      r_obj* chr_transform,
                      r_obj* needles_arg,
@@ -71,6 +79,7 @@ r_obj* vctrs_matches(r_obj* needles,
   const struct vctrs_no_match c_no_match = parse_no_match(no_match, "no_match");
   const struct vctrs_no_match c_remaining = parse_no_match(remaining, "remaining");
   enum vctrs_multiple c_multiple = parse_multiple(multiple);
+  enum vctrs_unique c_unique = parse_unique(unique);
 
   if (!r_is_bool(nan_distinct)) {
     r_abort("`nan_distinct` must be a single `TRUE` or `FALSE`.");
@@ -89,6 +98,7 @@ r_obj* vctrs_matches(r_obj* needles,
     &c_no_match,
     &c_remaining,
     c_multiple,
+    c_unique,
     c_nan_distinct,
     chr_transform,
     &c_needles_arg,
@@ -105,6 +115,7 @@ r_obj* vec_matches(r_obj* needles,
                    const struct vctrs_no_match* no_match,
                    const struct vctrs_no_match* remaining,
                    enum vctrs_multiple multiple,
+                   enum vctrs_unique unique,
                    bool nan_distinct,
                    r_obj* chr_transform,
                    struct vctrs_arg* needles_arg,
@@ -228,6 +239,7 @@ r_obj* vec_matches(r_obj* needles,
     no_match,
     remaining,
     multiple,
+    unique,
     any_filters,
     v_filters,
     v_ops,
@@ -253,6 +265,7 @@ r_obj* df_matches(r_obj* needles,
                   const struct vctrs_no_match* no_match,
                   const struct vctrs_no_match* remaining,
                   enum vctrs_multiple multiple,
+                  enum vctrs_unique unique,
                   bool any_filters,
                   const enum vctrs_filter* v_filters,
                   const enum vctrs_ops* v_ops,
@@ -260,10 +273,20 @@ r_obj* df_matches(r_obj* needles,
                   struct vctrs_arg* haystack_arg) {
   int n_prot = 0;
 
-  r_obj* o_needles = KEEP_N(vec_order(needles, chrs_asc, chrs_smallest, true, r_null), &n_prot);
+  r_obj* o_needles;
+  if (unique == VCTRS_UNIQUE_both || unique == VCTRS_UNIQUE_needles) {
+    // Check for duplicates
+    r_obj* info = KEEP(vec_order_info(needles, chrs_asc, chrs_smallest, true, r_null, true));
+    check_unique(info, needles_arg, true);
+    o_needles = r_list_get(info, 0);
+    FREE(1);
+  } else {
+    o_needles = vec_order(needles, chrs_asc, chrs_smallest, true, r_null);
+  }
+  KEEP_N(o_needles, &n_prot);
   const int* v_o_needles = r_int_cbegin(o_needles);
 
-  r_obj* info = KEEP_N(compute_nested_containment_info(haystack, multiple, v_ops), &n_prot);
+  r_obj* info = KEEP_N(compute_nested_containment_info(haystack, multiple, unique, v_ops, haystack_arg), &n_prot);
 
   r_obj* o_haystack = r_list_get(info, 0);
   const int* v_o_haystack = r_int_cbegin(o_haystack);
@@ -1378,6 +1401,69 @@ enum vctrs_multiple parse_multiple(r_obj* multiple) {
 // -----------------------------------------------------------------------------
 
 static inline
+enum vctrs_unique parse_unique(r_obj* unique) {
+  if (!r_is_string(unique)) {
+    r_abort("`unique` must be a string.");
+  }
+
+  const char* c_unique = r_chr_get_c_string(unique, 0);
+
+  if (!strcmp(c_unique, "neither")) return VCTRS_UNIQUE_neither;
+  if (!strcmp(c_unique, "needles")) return VCTRS_UNIQUE_needles;
+  if (!strcmp(c_unique, "haystack")) return VCTRS_UNIQUE_haystack;
+  if (!strcmp(c_unique, "both")) return VCTRS_UNIQUE_both;
+
+  r_abort("`unique` must be one of \"neither\", \"needles\", \"haystack\", or \"both\".");
+}
+
+static inline
+r_ssize find_first_duplicate(const int* v_group_sizes, r_ssize size) {
+  r_ssize group_start = 0;
+
+  for (r_ssize i = 0; i < size; ++i) {
+    int group_size = v_group_sizes[i];
+
+    if (group_size > 1) {
+      // The group start isn't the duplicate, 1 location past it is
+      return group_start + 1;
+    }
+
+    group_start += group_size;
+  }
+
+  r_stop_internal("find_first_duplicate", "Duplicate value should have been found.");
+}
+
+static inline
+void check_unique(r_obj* info, struct vctrs_arg* arg, bool needles) {
+  r_ssize max_group_size = r_as_int(r_list_get(info, 2));
+
+  if (max_group_size == 0) {
+    r_stop_internal("check_unique", "Maximum group size should never be 0.");
+  }
+
+  if (max_group_size == 1) {
+    // No duplicates
+    return;
+  }
+
+  r_obj* o = r_list_get(info, 0);
+  const int* v_o = r_int_cbegin(o);
+
+  r_obj* group_sizes = r_list_get(info, 1);
+  const int* v_group_sizes = r_int_cbegin(group_sizes);
+
+  r_ssize size = r_length(o);
+
+  r_ssize loc_duplicate_o = find_first_duplicate(v_group_sizes, size);
+  r_ssize loc_duplicate = v_o[loc_duplicate_o];
+
+  stop_matches_unique(loc_duplicate - 1, arg, needles);
+}
+
+// -----------------------------------------------------------------------------
+
+static inline
 enum vctrs_filter parse_filter_one(const char* filter, bool* p_any_filters) {
   if (!strcmp(filter, "none")) {
     return VCTRS_FILTER_none;
@@ -1905,18 +1991,23 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 // [[ register() ]]
 r_obj* vctrs_test_compute_nested_containment_info(r_obj* haystack,
                                                   r_obj* condition,
-                                                  r_obj* multiple) {
+                                                  r_obj* multiple,
+                                                  r_obj* unique) {
   r_ssize n_cols = r_length(haystack);
   enum vctrs_ops* v_ops = (enum vctrs_ops*) R_alloc(n_cols, sizeof(enum vctrs_ops));
   parse_condition(condition, v_ops, n_cols);
   enum vctrs_multiple c_multiple = parse_multiple(multiple);
-  return compute_nested_containment_info(haystack, c_multiple, v_ops);
+  enum vctrs_unique c_unique = parse_unique(unique);
+  struct vctrs_arg haystack_arg = new_wrapper_arg(NULL, "haystack");
+  return compute_nested_containment_info(haystack, c_multiple, c_unique, v_ops, &haystack_arg);
 }
 
 static
 r_obj* compute_nested_containment_info(r_obj* haystack,
                                        enum vctrs_multiple multiple,
-                                       const enum vctrs_ops* v_ops) {
+                                       enum vctrs_unique unique,
+                                       const enum vctrs_ops* v_ops,
+                                       struct vctrs_arg* haystack_arg) {
   r_ssize n_prot = 0;
 
   r_ssize n_cols = r_length(haystack);
@@ -1939,8 +2030,18 @@ r_obj* compute_nested_containment_info(r_obj* haystack,
   }
 
   if (!any_directional) {
-    // Nested group info isn't required for only `==`
-    r_list_poke(out, 0, vec_order(haystack, chrs_asc, chrs_smallest, true, r_null));
+    // Nested group info isn't required for only `==`, but we still have to
+    // check for potential duplicates in `haystack`.
+    r_obj* o_haystack;
+    if (unique == VCTRS_UNIQUE_both || unique == VCTRS_UNIQUE_haystack) {
+      r_obj* info = KEEP_N(vec_order_info(haystack, chrs_asc, chrs_smallest, true, r_null, true), &n_prot);
+      check_unique(info, haystack_arg, false);
+      o_haystack = r_list_get(info, 0);
+    } else {
+      o_haystack = KEEP_N(vec_order(haystack, chrs_asc, chrs_smallest, true, r_null), &n_prot);
+    }
+
+    r_list_poke(out, 0, o_haystack);
     r_list_poke(out, 1, vctrs_shared_empty_int);
     r_list_poke(out, 2, r_int(1));
     r_list_poke(out, 3, r_lgl(any_directional));
@@ -1948,14 +2049,11 @@ r_obj* compute_nested_containment_info(r_obj* haystack,
     return out;
   }
 
-  r_obj* info = KEEP_N(vec_order_info(
-    haystack,
-    chrs_asc,
-    chrs_smallest,
-    true,
-    r_null,
-    true
-  ), &n_prot);
+  r_obj* info = KEEP_N(vec_order_info(haystack, chrs_asc, chrs_smallest, true, r_null, true), &n_prot);
+
+  if (unique == VCTRS_UNIQUE_both || unique == VCTRS_UNIQUE_haystack) {
+    check_unique(info, haystack_arg, false);
+  }
 
   r_obj* o_haystack = r_list_get(info, 0);
   r_obj* group_sizes_haystack = r_list_get(info, 1);
@@ -2437,6 +2535,29 @@ void stop_matches_multiple(r_ssize i,
   Rf_eval(call, vctrs_ns_env);
 
   never_reached("stop_matches_multiple");
+}
+
+static inline
+void stop_matches_unique(r_ssize i,
+                         struct vctrs_arg* arg,
+                         bool needles) {
+  r_obj* syms[4] = {
+   syms_i,
+   syms_arg,
+   syms_needles,
+   NULL
+  };
+  r_obj* args[4] = {
+    KEEP(r_int((int)i + 1)),
+    KEEP(vctrs_arg(arg)),
+    KEEP(r_lgl(needles)),
+    NULL
+  };
+
+  r_obj* call = KEEP(r_call_n(syms_stop_matches_unique, syms, args));
+  Rf_eval(call, vctrs_ns_env);
+
+  never_reached("stop_matches_unique");
 }
 
 static inline

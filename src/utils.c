@@ -1593,6 +1593,7 @@ SEXP syms_stop_incompatible_size = NULL;
 SEXP syms_stop_matches_nothing = NULL;
 SEXP syms_stop_matches_remaining = NULL;
 SEXP syms_stop_matches_missing = NULL;
+SEXP syms_stop_matches_unique = NULL;
 SEXP syms_stop_matches_multiple = NULL;
 SEXP syms_warn_matches_multiple = NULL;
 SEXP syms_action = NULL;
@@ -1601,6 +1602,7 @@ SEXP syms_fallback_class = NULL;
 SEXP syms_abort = NULL;
 SEXP syms_message = NULL;
 SEXP syms_chr_transform = NULL;
+SEXP syms_needles = NULL;
 
 SEXP fns_bracket = NULL;
 SEXP fns_quote = NULL;
@@ -1866,6 +1868,7 @@ void vctrs_init_utils(SEXP ns) {
   syms_stop_incompatible_size = Rf_install("stop_incompatible_size");
   syms_stop_matches_nothing = Rf_install("stop_matches_nothing");
   syms_stop_matches_remaining = Rf_install("stop_matches_remaining");
+  syms_stop_matches_unique = Rf_install("stop_matches_unique");
   syms_stop_matches_missing = Rf_install("stop_matches_missing");
   syms_stop_matches_multiple = Rf_install("stop_matches_multiple");
   syms_warn_matches_multiple = Rf_install("warn_matches_multiple");
@@ -1875,6 +1878,7 @@ void vctrs_init_utils(SEXP ns) {
   syms_abort = Rf_install("abort");
   syms_message = Rf_install("message");
   syms_chr_transform = Rf_install("chr_transform");
+  syms_needles = Rf_install("needles");
 
   fns_bracket = Rf_findVar(syms_bracket, R_BaseEnv);
   fns_quote = Rf_findVar(Rf_install("quote"), R_BaseEnv);

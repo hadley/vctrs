@@ -110,6 +110,16 @@
 #'     otherwise falls back to `"all"`.
 #'   - `"error"` throws an error if multiple matches are detected.
 #'
+#' @param unique Enforcement of unique values in the inputs.
+#'   - `"neither"` allows duplicate values in `needles` and `haystack`.
+#'   - `"needles"` requires `needles` to contain only unique values.
+#'   - `"haystack"` requires `haystack` to contain only unique values.
+#'   - `"both"` requires both `needles` and `haystack` to contain only unique
+#'   values.
+#'
+#'   If multiple missing values are present, then the input is not considered
+#'   unique, regardless of the value of `missing`.
+#'
 #' @param needles_arg,haystack_arg Argument tags for `needles` and `haystack`
 #'   used in error messages.
 #'
@@ -229,6 +239,7 @@ vec_matches <- function(needles,
                         no_match = NA_integer_,
                         remaining = "drop",
                         multiple = "all",
+                        unique = "neither",
                         nan_distinct = FALSE,
                         chr_transform = NULL,
                         needles_arg = "",
@@ -247,6 +258,7 @@ vec_matches <- function(needles,
     no_match,
     remaining,
     multiple,
+    unique,
     nan_distinct,
     chr_transform,
     needles_arg,
@@ -365,6 +377,39 @@ cnd_header.vctrs_error_matches_missing <- function(cnd, ...) {
 #' @export
 cnd_body.vctrs_error_matches_missing <- function(cnd, ...) {
   bullet <- glue::glue("The element at location {cnd$i} is missing.")
+  bullet <- c(x = bullet)
+  format_error_bullets(bullet)
+}
+
+# ------------------------------------------------------------------------------
+
+stop_matches_unique <- function(i, arg, needles) {
+  stop_matches(
+    class = "vctrs_error_matches_unique",
+    i = i,
+    arg = arg,
+    needles = needles
+  )
+}
+
+#' @export
+cnd_header.vctrs_error_matches_unique <- function(cnd, ...) {
+  if (nzchar(cnd$arg)) {
+    name <- glue::glue("`{cnd$arg}` ")
+  } else {
+    if (cnd$needles) {
+      name <- "The needles "
+    } else {
+      name <- "The haystack "
+    }
+  }
+
+  glue::glue("{name}must not contain duplicate values.")
+}
+
+#' @export
+cnd_body.vctrs_error_matches_unique <- function(cnd, ...) {
+  bullet <- glue::glue("The element at location {cnd$i} is a duplicate.")
   bullet <- c(x = bullet)
   format_error_bullets(bullet)
 }

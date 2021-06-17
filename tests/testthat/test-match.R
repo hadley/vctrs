@@ -773,7 +773,7 @@ test_that("`filter` works when valid matches are in different nested containment
   needles <- data_frame(x = 0L, y = 1L, z = 2L)
   haystack <- data_frame(x = c(1L, 2L, 1L, 0L), y = c(2L, 1L, 2L, 3L), z = c(3L, 3L, 2L, 2L))
 
-  info <- compute_nested_containment_info(haystack, c("<=", "<=", "<="), "all")
+  info <- compute_nested_containment_info(haystack, c("<=", "<=", "<="), "all", "neither")
   haystack_order <- info[[1]]
   nested_groups <- info[[2]]
 
@@ -850,6 +850,53 @@ test_that("`filter` is validated", {
   expect_error(vec_matches(1, 2, filter = 1.5), "character vector")
   expect_error(vec_matches(1, 2, filter = "x"), 'one of "none", "min", or "max"')
   expect_error(vec_matches(1, 2, filter = c("min", "max")), "length 1, or the same length as")
+})
+
+# ------------------------------------------------------------------------------
+# vec_matches() - `unique`
+
+test_that("`unique` can error informatively", {
+  verify_output(test_path("error", "test-matches-unique.txt"), {
+    "# require unique haystack"
+    vec_matches(c(1, 1), c(1, 1), unique = "haystack")
+    vec_matches(c(1, 1), c(1, 1), unique = "haystack", haystack_arg = "foo")
+
+    "# require unique needles"
+    vec_matches(c(1, 1), c(1, 1), unique = "needles")
+    vec_matches(c(1, 1), c(1, 1), unique = "needles", needles_arg = "foo")
+
+    "# require both unique"
+    vec_matches(c(1, 1), 1, unique = "both", needles_arg = "foo", haystack_arg = "bar")
+    vec_matches(1, c(1, 1), unique = "both", needles_arg = "foo", haystack_arg = "bar")
+  })
+})
+
+test_that("`unique` check is bypassed with `condition = NULL`", {
+  expect <- data_frame(needles = c(1L, 1L, 2L, 2L), haystack = c(1L, 2L, 1L, 2L))
+
+  expect_identical(vec_matches(c(1, 1), c(1, 1), unique = "needles", condition = NULL), expect)
+  expect_identical(vec_matches(c(1, 1), c(1, 1), unique = "haystack", condition = NULL), expect)
+  expect_identical(vec_matches(c(1, 1), c(1, 1), unique = "both", condition = NULL), expect)
+})
+
+test_that("`unique` is affected by `nan_distinct`", {
+  x <- c(NA, NaN)
+
+  res <- vec_matches(x, x, nan_distinct = TRUE, unique = "needles")
+  expect_identical(res$needles, c(1L, 2L))
+  expect_identical(res$haystack, c(1L, 2L))
+
+  expect_error(vec_matches(x, x, nan_distinct = FALSE, unique = "needles"), "location 2")
+})
+
+test_that("`unique` is not affected by `missing`", {
+  x <- c(NA, NA)
+  expect_error(vec_matches(x, x, missing = "propagate", unique = "needles"), "location 2")
+})
+
+test_that("`unique` is validated", {
+  expect_error(vec_matches(1, 2, unique = 1.5), "`unique` must be a string")
+  expect_error(vec_matches(1, 2, unique = "x"), 'one of "neither", "needles", "haystack", or "both"')
 })
 
 # ------------------------------------------------------------------------------
@@ -1006,7 +1053,7 @@ test_that("`multiple = 'first' doesn't require nested groups if completely order
   # Single nested containment group.
   # It is already completely ordered (in ascending order by value and row number).
   df <- data_frame(x = c(1L, 1L, 2L, 3L))
-  res <- compute_nested_containment_info(df, ">=", "first")
+  res <- compute_nested_containment_info(df, ">=", "first", "neither")
   nested_groups <- res[[2]]
   expect_identical(nested_groups, integer())
 })
@@ -1022,7 +1069,7 @@ test_that("`multiple = 'first'` requires increasing row order, and looks at grou
   #   but is smaller in row number. It becomes a new group with its partner at
   #   location 5.
   df <- data_frame(x = c(3L, 1L, 2L, 1L, 3L))
-  res <- compute_nested_containment_info(df, ">=", "first")
+  res <- compute_nested_containment_info(df, ">=", "first", "neither")
   nested_groups <- res[[2]]
   expect_identical(nested_groups, c(1L, 0L, 0L, 0L, 1L))
 })
@@ -1037,7 +1084,7 @@ test_that("`multiple = 'last'` requires increasing row order, and looks at group
   # - Look at the 3 at location 5, it is greater than the 1 at location 4 in
   #   both size and row number. It joins that group.
   df <- data_frame(x = c(3L, 1L, 2L, 1L, 3L))
-  res <- compute_nested_containment_info(df, ">=", "last")
+  res <- compute_nested_containment_info(df, ">=", "last", "neither")
   nested_groups <- res[[2]]
   expect_identical(nested_groups, c(0L, 0L, 1L, 0L, 0L))
 })

@@ -509,6 +509,7 @@ extern SEXP syms_stop_incompatible_size;
 extern SEXP syms_stop_matches_nothing;
 extern SEXP syms_stop_matches_remaining;
 extern SEXP syms_stop_matches_missing;
+extern SEXP syms_stop_matches_unique;
 extern SEXP syms_stop_matches_multiple;
 extern SEXP syms_warn_matches_multiple;
 extern SEXP syms_action;
@@ -517,6 +518,7 @@ extern SEXP syms_fallback_class;
 extern SEXP syms_abort;
 extern SEXP syms_message;
 extern SEXP syms_chr_transform;
+extern SEXP syms_needles;
 
 static const char * const c_strs_vctrs_common_class_fallback = "vctrs:::common_class_fallback";
 

@@ -7,6 +7,7 @@ r_obj* vec_matches(r_obj* needles,
                    const struct vctrs_no_match* no_match,
                    const struct vctrs_no_match* remaining,
                    enum vctrs_multiple multiple,
+                   enum vctrs_unique unique,
                    bool nan_distinct,
                    r_obj* chr_transform,
                    struct vctrs_arg* needles_arg,
@@ -24,6 +25,7 @@ r_obj* df_matches(r_obj* needles,
                   const struct vctrs_no_match* no_match,
                   const struct vctrs_no_match* remaining,
                   enum vctrs_multiple multiple,
+                  enum vctrs_unique unique,
                   bool any_filters,
                   const enum vctrs_filter* v_filters,
                   const enum vctrs_ops* v_ops,
@@ -122,6 +124,12 @@ static inline
 enum vctrs_multiple parse_multiple(r_obj* multiple);
 
 static inline
+enum vctrs_unique parse_unique(r_obj* unique);
+
+static inline
+void check_unique(r_obj* info, struct vctrs_arg* arg, bool needles);
+
+static inline
 void parse_filter(r_obj* filter,
                   r_ssize n_cols,
                   enum vctrs_filter* v_filters,
@@ -161,7 +169,9 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
 static
 r_obj* compute_nested_containment_info(r_obj* haystack,
                                        enum vctrs_multiple multiple,
-                                       const enum vctrs_ops* v_ops);
+                                       enum vctrs_unique unique,
+                                       const enum vctrs_ops* v_ops,
+                                       struct vctrs_arg* haystack_arg);
 
 static
 r_obj* nested_containment_order(r_obj* x,
@@ -208,6 +218,11 @@ void stop_matches_remaining(r_ssize i,
 
 static inline
 void stop_matches_missing(r_ssize i, struct vctrs_arg* needles_arg);
+
+static inline
+void stop_matches_unique(r_ssize i,
+                         struct vctrs_arg* arg,
+                         bool needles);
 
 static inline
 void stop_matches_multiple(r_ssize i,
