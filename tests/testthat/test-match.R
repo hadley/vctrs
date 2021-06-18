@@ -1037,6 +1037,10 @@ test_that("`condition = NULL` works with `no_match = 'drop'`", {
 })
 
 test_that("potential overflow on large output size is caught informatively", {
+  # Windows 32-bit doesn't support long vectors of this size, and the
+  # intermediate `r_ssize` will be too large
+  skip_if(.Machine$sizeof.pointer < 8L, message = "No long vector support")
+
   verify_output(test_path("error", "test-matches-overflow-output.txt"), {
     "# catches potential overflow"
     vec_matches(1:1e7, 1:1e7, condition = ">=")
