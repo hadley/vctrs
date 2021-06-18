@@ -110,15 +110,15 @@
 #'     otherwise falls back to `"all"`.
 #'   - `"error"` throws an error if multiple matches are detected.
 #'
-#' @param unique Enforcement of unique values in the inputs.
-#'   - `"neither"` allows duplicate values in `needles` and `haystack`.
-#'   - `"needles"` requires `needles` to contain only unique values.
-#'   - `"haystack"` requires `haystack` to contain only unique values.
-#'   - `"both"` requires both `needles` and `haystack` to contain only unique
-#'   values.
+#' @param check_duplicates Which inputs should be checked for duplicate values?
+#'   If any duplicate values are found, then an error is thrown.
+#'   - `"neither"` doesn't check for duplicates.
+#'   - `"needles"` checks for duplicates in `needles`.
+#'   - `"haystack"` checks for duplicates in `haystack`.
+#'   - `"both"` checks for duplicates in both inputs.
 #'
-#'   If multiple missing values are present, then the input is not considered
-#'   unique, regardless of the value of `missing`.
+#'   If multiple missing values are present, then they are considered
+#'   duplicates regardless of the value of `missing`.
 #'
 #' @param needles_arg,haystack_arg Argument tags for `needles` and `haystack`
 #'   used in error messages.
@@ -239,7 +239,7 @@ vec_matches <- function(needles,
                         no_match = NA_integer_,
                         remaining = "drop",
                         multiple = "all",
-                        unique = "neither",
+                        check_duplicates = "neither",
                         nan_distinct = FALSE,
                         chr_transform = NULL,
                         needles_arg = "",
@@ -258,7 +258,7 @@ vec_matches <- function(needles,
     no_match,
     remaining,
     multiple,
-    unique,
+    check_duplicates,
     nan_distinct,
     chr_transform,
     needles_arg,
@@ -383,9 +383,9 @@ cnd_body.vctrs_error_matches_missing <- function(cnd, ...) {
 
 # ------------------------------------------------------------------------------
 
-stop_matches_unique <- function(i, arg, needles) {
+stop_matches_duplicates <- function(i, arg, needles) {
   stop_matches(
-    class = "vctrs_error_matches_unique",
+    class = "vctrs_error_matches_duplicates",
     i = i,
     arg = arg,
     needles = needles
@@ -393,7 +393,7 @@ stop_matches_unique <- function(i, arg, needles) {
 }
 
 #' @export
-cnd_header.vctrs_error_matches_unique <- function(cnd, ...) {
+cnd_header.vctrs_error_matches_duplicates <- function(cnd, ...) {
   if (nzchar(cnd$arg)) {
     name <- glue::glue("`{cnd$arg}` ")
   } else {
@@ -408,7 +408,7 @@ cnd_header.vctrs_error_matches_unique <- function(cnd, ...) {
 }
 
 #' @export
-cnd_body.vctrs_error_matches_unique <- function(cnd, ...) {
+cnd_body.vctrs_error_matches_duplicates <- function(cnd, ...) {
   bullet <- glue::glue("The element at location {cnd$i} is a duplicate.")
   bullet <- c(x = bullet)
   format_error_bullets(bullet)

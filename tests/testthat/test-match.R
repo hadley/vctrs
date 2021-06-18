@@ -853,50 +853,50 @@ test_that("`filter` is validated", {
 })
 
 # ------------------------------------------------------------------------------
-# vec_matches() - `unique`
+# vec_matches() - `check_duplicates`
 
-test_that("`unique` can error informatively", {
-  verify_output(test_path("error", "test-matches-unique.txt"), {
-    "# require unique haystack"
-    vec_matches(c(1, 1), c(1, 1), unique = "haystack")
-    vec_matches(c(1, 1), c(1, 1), unique = "haystack", haystack_arg = "foo")
+test_that("`check_duplicates` can error informatively", {
+  verify_output(test_path("error", "test-matches-duplicates.txt"), {
+    "# check for duplicates in haystack"
+    vec_matches(c(1, 1), c(1, 1), check_duplicates = "haystack")
+    vec_matches(c(1, 1), c(1, 1), check_duplicates = "haystack", haystack_arg = "foo")
 
-    "# require unique needles"
-    vec_matches(c(1, 1), c(1, 1), unique = "needles")
-    vec_matches(c(1, 1), c(1, 1), unique = "needles", needles_arg = "foo")
+    "# check for duplicates in needles"
+    vec_matches(c(1, 1), c(1, 1), check_duplicates = "needles")
+    vec_matches(c(1, 1), c(1, 1), check_duplicates = "needles", needles_arg = "foo")
 
-    "# require both unique"
-    vec_matches(c(1, 1), 1, unique = "both", needles_arg = "foo", haystack_arg = "bar")
-    vec_matches(1, c(1, 1), unique = "both", needles_arg = "foo", haystack_arg = "bar")
+    "# check for duplicates in both"
+    vec_matches(c(1, 1), 1, check_duplicates = "both", needles_arg = "foo", haystack_arg = "bar")
+    vec_matches(1, c(1, 1), check_duplicates = "both", needles_arg = "foo", haystack_arg = "bar")
   })
 })
 
-test_that("`unique` check is bypassed with `condition = NULL`", {
+test_that("`check_duplicates` is bypassed with `condition = NULL`", {
   expect <- data_frame(needles = c(1L, 1L, 2L, 2L), haystack = c(1L, 2L, 1L, 2L))
 
-  expect_identical(vec_matches(c(1, 1), c(1, 1), unique = "needles", condition = NULL), expect)
-  expect_identical(vec_matches(c(1, 1), c(1, 1), unique = "haystack", condition = NULL), expect)
-  expect_identical(vec_matches(c(1, 1), c(1, 1), unique = "both", condition = NULL), expect)
+  expect_identical(vec_matches(c(1, 1), c(1, 1), check_duplicates = "needles", condition = NULL), expect)
+  expect_identical(vec_matches(c(1, 1), c(1, 1), check_duplicates = "haystack", condition = NULL), expect)
+  expect_identical(vec_matches(c(1, 1), c(1, 1), check_duplicates = "both", condition = NULL), expect)
 })
 
-test_that("`unique` is affected by `nan_distinct`", {
+test_that("`check_duplicates` is affected by `nan_distinct`", {
   x <- c(NA, NaN)
 
-  res <- vec_matches(x, x, nan_distinct = TRUE, unique = "needles")
+  res <- vec_matches(x, x, nan_distinct = TRUE, check_duplicates = "needles")
   expect_identical(res$needles, c(1L, 2L))
   expect_identical(res$haystack, c(1L, 2L))
 
-  expect_error(vec_matches(x, x, nan_distinct = FALSE, unique = "needles"), "location 2")
+  expect_error(vec_matches(x, x, nan_distinct = FALSE, check_duplicates = "needles"), "location 2")
 })
 
-test_that("`unique` is not affected by `missing`", {
+test_that("`check_duplicates` is not affected by `missing`", {
   x <- c(NA, NA)
-  expect_error(vec_matches(x, x, missing = "propagate", unique = "needles"), "location 2")
+  expect_error(vec_matches(x, x, missing = "propagate", check_duplicates = "needles"), "location 2")
 })
 
-test_that("`unique` is validated", {
-  expect_error(vec_matches(1, 2, unique = 1.5), "`unique` must be a string")
-  expect_error(vec_matches(1, 2, unique = "x"), 'one of "neither", "needles", "haystack", or "both"')
+test_that("`check_duplicates` is validated", {
+  expect_error(vec_matches(1, 2, check_duplicates = 1.5), "`check_duplicates` must be a string")
+  expect_error(vec_matches(1, 2, check_duplicates = "x"), 'one of "neither", "needles", "haystack", or "both"')
 })
 
 # ------------------------------------------------------------------------------
