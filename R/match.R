@@ -12,10 +12,10 @@
 #' `vec_matches(needles, haystack, condition = "==", multiple = "first",
 #' nan_distinct = TRUE)`.
 #'
-#' `vec_matches()` is extremely similar to a SQL left join between `needles` and
-#' `haystack`. Using `condition` is analogous to specifying a SQL ON statement,
-#' and `condition = NULL` is identical to specifying a left join without an ON
-#' statement.
+#' `vec_matches()` is extremely similar to a SQL join between `needles` and
+#' `haystack`, with the default being most similar to a left join. Using
+#' `condition` is analogous to specifying a SQL ON statement, and `condition =
+#' NULL` is identical to specifying a join without an ON statement.
 #'
 #' When `missing = "match"`, missing values are allowed to exactly match other
 #' missing values, but will not match any other values. This implies that
@@ -103,8 +103,7 @@
 #'
 #' @param multiple Handling of `needles` with multiple matches. For each needle:
 #'   - `"all"` returns every match detected in `haystack`.
-#'   - `"first"` returns the first match detected in `haystack` (this is similar
-#'     to how [vec_match()] works).
+#'   - `"first"` returns the first match detected in `haystack`.
 #'   - `"last"` returns the last match detected in `haystack`.
 #'   - `"warning"` throws a warning if multiple matches are detected, but
 #'     otherwise falls back to `"all"`.
@@ -181,7 +180,7 @@
 #'
 #' # You can limit which matches are returned with a `filter`. For example,
 #' # with the above example you can filter the matches returned by `x[[i]] >= y`
-#' # down to only the ones containing the maximum value of those matches.
+#' # down to only the ones containing the maximum `y` value of those matches.
 #' matches <- vec_matches(x, y, condition = ">=", filter = "max")
 #'
 #' # Here, the matches for the `3` needle value have been filtered down to
