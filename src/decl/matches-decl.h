@@ -16,8 +16,8 @@ r_obj* vec_matches(r_obj* needles,
 static
 r_obj* df_matches(r_obj* needles,
                   r_obj* haystack,
-                  r_obj* needles_missings,
-                  r_obj* haystack_missings,
+                  r_obj* needles_complete,
+                  r_obj* haystack_complete,
                   r_ssize size_needles,
                   r_ssize size_haystack,
                   enum vctrs_missing_needle missing,
@@ -40,8 +40,8 @@ void df_matches_recurse(r_ssize col,
                         r_ssize loc_upper_o_haystack,
                         const struct poly_df_data* p_needles,
                         const struct poly_df_data* p_haystack,
-                        const struct poly_df_data* p_needles_missings,
-                        const struct poly_df_data* p_haystack_missings,
+                        const struct poly_df_data* p_needles_complete,
+                        const struct poly_df_data* p_haystack_complete,
                         const int* v_o_needles,
                         const int* v_o_haystack,
                         bool missing_propagate,
@@ -64,8 +64,8 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    r_ssize loc_upper_o_needles,
                                    const struct poly_df_data* p_needles,
                                    const struct poly_df_data* p_haystack,
-                                   const struct poly_df_data* p_needles_missings,
-                                   const struct poly_df_data* p_haystack_missings,
+                                   const struct poly_df_data* p_needles_complete,
+                                   const struct poly_df_data* p_haystack_complete,
                                    const int* v_o_needles,
                                    const int* v_o_haystack,
                                    bool missing_propagate,
@@ -80,10 +80,10 @@ void df_matches_with_nested_groups(r_ssize size_haystack,
                                    r_ssize* p_n_extra);
 
 static inline
-r_ssize int_locate_upper_missing(const int* v_haystack_missings,
-                                 const int* v_o_haystack,
-                                 r_ssize loc_lower_o_haystack,
-                                 r_ssize loc_upper_o_haystack);
+r_ssize int_locate_upper_incomplete(const int* v_haystack_complete,
+                                    const int* v_o_haystack,
+                                    r_ssize loc_lower_o_haystack,
+                                    r_ssize loc_upper_o_haystack);
 static inline
 r_ssize int_lower_duplicate(int needle,
                             const int* v_haystack,
@@ -119,7 +119,7 @@ r_obj* df_joint_xtfrm_by_col(r_obj* x,
                              r_obj* chr_transform);
 
 static
-r_obj* df_missings_by_col(r_obj* x, r_ssize x_size, r_ssize n_cols);
+r_obj* df_detect_complete_by_col(r_obj* x, r_ssize x_size, r_ssize n_cols);
 
 static inline
 void parse_condition(r_obj* condition, enum vctrs_ops* v_ops, r_ssize n_cols);
