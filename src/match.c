@@ -561,12 +561,13 @@ void df_matches_recurse(r_ssize col,
     bool do_rhs = loc_group_upper_o_needles < loc_upper_o_needles;
 
     if (do_lhs) {
-      loc_upper_o_needles = loc_group_lower_o_needles - 1;
+      const r_ssize lhs_loc_lower_o_needles = loc_lower_o_needles;
+      const r_ssize lhs_loc_upper_o_needles = loc_group_lower_o_needles - 1;
 
       df_matches_recurse(
         col,
-        loc_lower_o_needles,
-        loc_upper_o_needles,
+        lhs_loc_lower_o_needles,
+        lhs_loc_upper_o_needles,
         loc_lower_o_haystack,
         loc_upper_o_haystack,
         p_needles,
@@ -588,12 +589,13 @@ void df_matches_recurse(r_ssize col,
       );
     }
     if (do_rhs) {
-      loc_lower_o_needles = loc_group_upper_o_needles + 1;
+      const r_ssize rhs_loc_lower_o_needles = loc_group_upper_o_needles + 1;
+      const r_ssize rhs_loc_upper_o_needles = loc_upper_o_needles;
 
       df_matches_recurse(
         col,
-        loc_lower_o_needles,
-        loc_upper_o_needles,
+        rhs_loc_lower_o_needles,
+        rhs_loc_upper_o_needles,
         loc_lower_o_haystack,
         loc_upper_o_haystack,
         p_needles,
