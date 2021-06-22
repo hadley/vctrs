@@ -6,7 +6,10 @@
 #include "poly-op.h"
 #include "compare.h"
 #include "ptype2.h"
+#include "translate.h"
 #include "order-radix.h"
+#include "order-transform.h"
+#include "match-compare.h"
 
 // -----------------------------------------------------------------------------
 
@@ -206,21 +209,20 @@ r_obj* vec_matches(r_obj* needles,
 
   // Compute the locations of missing values for each column if computing ranks
   // later on is going to replace the missing values with integer ranks
-  r_obj* needles_missings = missing_propagate ? r_null : df_missings_by_col(needles, size_needles, n_cols);
+  r_obj* needles_missings = df_missings_by_col(needles, size_needles, n_cols);
   KEEP_N(needles_missings, &n_prot);
 
-  r_obj* haystack_missings = missing_propagate ? r_null : df_missings_by_col(haystack, size_haystack, n_cols);
+  r_obj* haystack_missings = df_missings_by_col(haystack, size_haystack, n_cols);
   KEEP_N(haystack_missings, &n_prot);
 
-  // Compute joint ranks to simplify each column down to an integer vector
-  r_obj* args = KEEP_N(df_joint_ranks(
+  // Compute joint xtfrm to simplify each column down to an integer vector
+  r_obj* args = KEEP_N(df_joint_xtfrm_by_col(
     needles,
     haystack,
     size_needles,
     size_haystack,
     n_cols,
     ptype,
-    missing_propagate,
     nan_distinct,
     chr_transform
   ), &n_prot);
@@ -380,20 +382,14 @@ r_obj* df_matches(r_obj* needles,
   const struct poly_df_data* p_needles_missings;
   const struct poly_df_data* p_haystack_missings;
 
-  if (missing_propagate) {
-    // NAs propagated through the ranks, so we can use them directly
-    p_needles_missings = p_needles;
-    p_haystack_missings = p_haystack;
-  } else {
-    // NAs were removed from the ranks, so grab them from the "missing" data frames
-    struct poly_vec* p_poly_needles_missings = new_poly_vec(needles_missings, vctrs_type_dataframe);
-    PROTECT_POLY_VEC(p_poly_needles_missings, &n_prot);
-    p_needles_missings = (const struct poly_df_data*) p_poly_needles_missings->p_vec;
+  // NAs were removed from the ranks, so grab them from the "missing" data frames
+  struct poly_vec* p_poly_needles_missings = new_poly_vec(needles_missings, vctrs_type_dataframe);
+  PROTECT_POLY_VEC(p_poly_needles_missings, &n_prot);
+  p_needles_missings = (const struct poly_df_data*) p_poly_needles_missings->p_vec;
 
-    struct poly_vec* p_poly_haystack_missings = new_poly_vec(haystack_missings, vctrs_type_dataframe);
-    PROTECT_POLY_VEC(p_poly_haystack_missings, &n_prot);
-    p_haystack_missings = (const struct poly_df_data*) p_poly_haystack_missings->p_vec;
-  }
+  struct poly_vec* p_poly_haystack_missings = new_poly_vec(haystack_missings, vctrs_type_dataframe);
+  PROTECT_POLY_VEC(p_poly_haystack_missings, &n_prot);
+  p_haystack_missings = (const struct poly_df_data*) p_poly_haystack_missings->p_vec;
 
   r_ssize n_extra = 0;
 
@@ -1232,16 +1228,201 @@ r_ssize int_upper_duplicate(int needle,
 
 // -----------------------------------------------------------------------------
 
+#define VEC_JOINT_XTFRM_LOOP(CMP) do {                         \
+  while (i < x_n_groups && j < y_n_groups) {                   \
+    const int x_group_size = v_x_group_sizes[i];               \
+    const int y_group_size = v_y_group_sizes[j];               \
+                                                               \
+    const int x_loc = v_x_o[x_o_loc] - 1;                      \
+    const int y_loc = v_y_o[y_o_loc] - 1;                      \
+                                                               \
+    const int cmp = CMP(                                       \
+      p_x_vec, x_loc,                                          \
+      p_y_vec, y_loc,                                          \
+      nan_distinct                                             \
+    );                                                         \
+                                                               \
+    if (cmp == -1) {                                           \
+      for (int k = 0; k < x_group_size; ++k) {                 \
+        v_x_ranks[v_x_o[x_o_loc] - 1] = rank;                  \
+        ++x_o_loc;                                             \
+      }                                                        \
+      ++i;                                                     \
+    } else if (cmp == 1) {                                     \
+      for (int k = 0; k < y_group_size; ++k) {                 \
+        v_y_ranks[v_y_o[y_o_loc] - 1] = rank;                  \
+        ++y_o_loc;                                             \
+      }                                                        \
+      ++j;                                                     \
+    } else {                                                   \
+      for (int k = 0; k < x_group_size; ++k) {                 \
+        v_x_ranks[v_x_o[x_o_loc] - 1] = rank;                  \
+        ++x_o_loc;                                             \
+      }                                                        \
+      for (int k = 0; k < y_group_size; ++k) {                 \
+        v_y_ranks[v_y_o[y_o_loc] - 1] = rank;                  \
+        ++y_o_loc;                                             \
+      }                                                        \
+      ++i;                                                     \
+      ++j;                                                     \
+    }                                                          \
+                                                               \
+    ++rank;                                                    \
+  }                                                            \
+} while(0)
+
+/*
+ * `vec_joint_xtfrm()` takes two columns of the same type and computes an
+ * xtfrm-like integer proxy for each that takes into account the values between
+ * the two columns. It is approximately equal to the idea of:
+ * `vec_rank(vec_c(x, y), ties = "dense")`
+ * followed by splitting the ranks back up into two vectors matching the sizes
+ * of x and y. The reason we don't do that is because it limits the maximum size
+ * that `vec_matches()` can work on to `vec_size(x) + vec_size(y) <= INT_MAX`,
+ * since you have to combine the vectors together.
+ *
+ * # For example:
+ * x <- c(2, 1.5, 1)
+ * y <- c(3, 1.2, 2)
+ * # vec_joint_xtfrm(x, y) theoretically results in:
+ * x <- c(4L, 3L, 1L)
+ * y <- c(5L, 2L, 4L)
+ * # While the above result is the general idea, we actually start counting
+ * # from `INT_MIN + 1` to maximally utilize the `int` space while still
+ * # avoiding `INT_MIN == NA_INTEGER`. So the result is really:
+ * x <- c(-2147483644L, -2147483645L, -2147483647L)
+ * y <- c(-2147483643L, -2147483646L, -2147483644L)
+ */
 static
-r_obj* df_joint_ranks(r_obj* x,
-                      r_obj* y,
-                      r_ssize x_size,
-                      r_ssize y_size,
-                      r_ssize n_cols,
-                      r_obj* ptype,
-                      bool na_propagate,
-                      bool nan_distinct,
-                      r_obj* chr_transform) {
+r_obj* vec_joint_xtfrm(r_obj* x,
+                       r_obj* y,
+                       r_ssize x_size,
+                       r_ssize y_size,
+                       bool nan_distinct,
+                       r_obj* chr_transform) {
+  int n_prot = 0;
+
+  r_obj* out = KEEP_N(r_alloc_list(2), &n_prot);
+
+  // These aren't true ranks, but the name makes the most sense
+  r_obj* x_ranks = r_alloc_integer(x_size);
+  r_list_poke(out, 0, x_ranks);
+  int* v_x_ranks = r_int_begin(x_ranks);
+
+  r_obj* y_ranks = r_alloc_integer(y_size);
+  r_list_poke(out, 1, y_ranks);
+  int* v_y_ranks = r_int_begin(y_ranks);
+
+  // Apply proxy and transforms ahead of time, since comparisons will be
+  // made on the actual values after ordering
+  r_obj* x_proxy = KEEP_N(vec_proxy_order(x), &n_prot);
+  x_proxy = KEEP_N(vec_normalize_encoding(x_proxy), &n_prot);
+  x_proxy = KEEP_N(proxy_chr_transform(x_proxy, chr_transform), &n_prot);
+
+  r_obj* y_proxy = KEEP_N(vec_proxy_order(y), &n_prot);
+  y_proxy = KEEP_N(vec_normalize_encoding(y_proxy), &n_prot);
+  y_proxy = KEEP_N(proxy_chr_transform(y_proxy, chr_transform), &n_prot);
+
+  r_obj* x_info = KEEP_N(vec_order_info(
+    x_proxy,
+    chrs_asc,
+    chrs_smallest,
+    nan_distinct,
+    r_null,
+    true
+  ), &n_prot);
+
+  const int* v_x_o = r_int_cbegin(r_list_get(x_info, 0));
+  const int* v_x_group_sizes = r_int_cbegin(r_list_get(x_info, 1));
+  r_ssize x_n_groups = r_length(r_list_get(x_info, 1));
+
+  r_obj* y_info = KEEP_N(vec_order_info(
+    y_proxy,
+    chrs_asc,
+    chrs_smallest,
+    nan_distinct,
+    r_null,
+    true
+  ), &n_prot);
+
+  const int* v_y_o = r_int_cbegin(r_list_get(y_info, 0));
+  const int* v_y_group_sizes = r_int_cbegin(r_list_get(y_info, 1));
+  r_ssize y_n_groups = r_length(r_list_get(y_info, 1));
+
+  const enum vctrs_type type = vec_proxy_typeof(x_proxy);
+
+  const struct poly_vec* p_x_poly = new_poly_vec(x_proxy, type);
+  PROTECT_POLY_VEC(p_x_poly, &n_prot);
+  const void* p_x_vec = p_x_poly->p_vec;
+
+  const struct poly_vec* p_y_poly = new_poly_vec(y_proxy, type);
+  PROTECT_POLY_VEC(p_x_poly, &n_prot);
+  const void* p_y_vec = p_y_poly->p_vec;
+
+  r_ssize i = 0;
+  r_ssize j = 0;
+  r_ssize x_o_loc = 0;
+  r_ssize y_o_loc = 0;
+
+  // Start rank as small as possible (while still different from NA),
+  // to maximally utilize `int` storage
+  int rank = INT_MIN + 1;
+
+  // Now that we have the ordering of both vectors,
+  // its just a matter of merging two sorted arrays
+  switch (type) {
+  case vctrs_type_logical: VEC_JOINT_XTFRM_LOOP(p_lgl_order_compare_na_equal); break;
+  case vctrs_type_integer: VEC_JOINT_XTFRM_LOOP(p_int_order_compare_na_equal); break;
+  case vctrs_type_double: VEC_JOINT_XTFRM_LOOP(p_dbl_order_compare_na_equal); break;
+  case vctrs_type_complex: VEC_JOINT_XTFRM_LOOP(p_cpl_order_compare_na_equal); break;
+  case vctrs_type_character: VEC_JOINT_XTFRM_LOOP(p_chr_order_compare_na_equal); break;
+  case vctrs_type_dataframe: VEC_JOINT_XTFRM_LOOP(p_df_order_compare_na_equal); break;
+  default: stop_unimplemented_vctrs_type("vec_joint_xtfrm", type);
+  }
+
+  while (i < x_n_groups) {
+    // Finish up remaining x groups
+    const int x_group_size = v_x_group_sizes[i];
+
+    for (int k = 0; k < x_group_size; ++k) {
+      v_x_ranks[v_x_o[x_o_loc] - 1] = rank;
+      ++x_o_loc;
+    }
+
+    ++i;
+    ++rank;
+  }
+
+  while (j < y_n_groups) {
+    // Finish up remaining y groups
+    const int y_group_size = v_y_group_sizes[j];
+
+    for (int k = 0; k < y_group_size; ++k) {
+      v_y_ranks[v_y_o[y_o_loc] - 1] = rank;
+      ++y_o_loc;
+    }
+
+    ++j;
+    ++rank;
+  }
+
+  FREE(n_prot);
+  return out;
+}
+
+
+#undef VEC_JOINT_XTFRM_LOOP
+
+
+static
+r_obj* df_joint_xtfrm_by_col(r_obj* x,
+                             r_obj* y,
+                             r_ssize x_size,
+                             r_ssize y_size,
+                             r_ssize n_cols,
+                             r_obj* ptype,
+                             bool nan_distinct,
+                             r_obj* chr_transform) {
   r_obj* out = KEEP(r_alloc_list(2));
 
   x = r_clone(x);
@@ -1250,48 +1431,18 @@ r_obj* df_joint_ranks(r_obj* x,
   y = r_clone(y);
   r_list_poke(out, 1, y);
 
-  r_obj* x_slicer = KEEP(compact_seq(0, x_size, true));
-  r_obj* y_slicer = KEEP(compact_seq(x_size, y_size, true));
-
   r_obj* const* v_x = r_list_cbegin(x);
   r_obj* const* v_y = r_list_cbegin(y);
-  r_obj* const* v_ptype = r_list_cbegin(ptype);
 
-  r_obj* zap = KEEP(r_alloc_list(0));
-  r_poke_class(zap, r_chr("rlang_zap"));
-
-  r_obj* c_args = KEEP(r_alloc_list(2));
-
-  for (r_ssize i = 0; i < n_cols; ++i) {
-    r_obj* x_elt = v_x[i];
-    r_obj* y_elt = v_y[i];
-    r_obj* ptype_elt = v_ptype[i];
-
-    r_list_poke(c_args, 0, x_elt);
-    r_list_poke(c_args, 1, y_elt);
-
-    // Combine columns
-    r_obj* both = KEEP(vec_c(c_args, ptype_elt, zap, p_no_repair_silent_ops));
-
-    // Compute joint rank
-    r_obj* rank = KEEP(vec_rank(
-      both,
-      TIES_dense,
-      na_propagate,
-      chrs_asc,
-      chrs_smallest,
-      nan_distinct,
-      chr_transform
-    ));
-
-    // Separate and store back in x and y
-    r_list_poke(x, i, vec_slice_impl(rank, x_slicer));
-    r_list_poke(y, i, vec_slice_impl(rank, y_slicer));
-
-    FREE(2);
+  for (r_ssize col = 0; col < n_cols; ++col) {
+    r_obj* x_col = v_x[col];
+    r_obj* y_col = v_y[col];
+    r_obj* xtfrms = vec_joint_xtfrm(x_col, y_col, x_size, y_size, nan_distinct, chr_transform);
+    r_list_poke(x, col, r_list_get(xtfrms, 0));
+    r_list_poke(y, col, r_list_get(xtfrms, 1));
   }
 
-  FREE(5);
+  FREE(1);
   return out;
 }
 

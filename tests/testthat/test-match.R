@@ -186,6 +186,9 @@ test_that("list missingness propagates", {
 })
 
 test_that("list ordering is by first appearance in `needles` (so non-equi joins don't make much sense)", {
+  skip("Until #1401 is fixed")
+  skip("Since vec_proxy_order.list utilizes appearance order, but is computed separatly for x and y")
+
   x <- list(3, 2, 1, NULL)
   y <- list(1, 3, 1, 3)
 
