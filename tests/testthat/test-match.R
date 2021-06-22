@@ -238,6 +238,11 @@ test_that("ensure that matching works if outer runs are present (i.e. `==` comes
 
   expect_identical(res$needles, 1:4)
   expect_identical(res$haystack, c(1L, NA, 2L, 1L))
+
+  res <- vec_matches(df1, df2, condition = c("==", ">=", "<"))
+
+  expect_identical(res$needles, c(1L, 2L, 3L, 3L, 4L))
+  expect_identical(res$haystack, c(1L, NA, 1L, 2L, 1L))
 })
 
 test_that("df-cols propagate an NA if any columns are incomplete", {
