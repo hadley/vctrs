@@ -98,17 +98,6 @@ r_ssize int_upper_duplicate(int needle,
                             r_ssize loc_upper_o_haystack);
 
 static
-r_obj* df_joint_ranks(r_obj* x,
-                      r_obj* y,
-                      r_ssize x_size,
-                      r_ssize y_size,
-                      r_ssize n_cols,
-                      r_obj* ptype,
-                      bool na_propagate,
-                      bool nan_distinct,
-                      r_obj* chr_transform);
-
-static
 r_obj* df_joint_xtfrm_by_col(r_obj* x,
                              r_obj* y,
                              r_ssize x_size,
