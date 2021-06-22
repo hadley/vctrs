@@ -1314,12 +1314,15 @@ r_obj* vec_joint_xtfrm(r_obj* x,
   int* v_y_ranks = r_int_begin(y_ranks);
 
   // Apply proxy and transforms ahead of time, since comparisons will be
-  // made on the actual values after ordering
-  r_obj* x_proxy = KEEP_N(vec_proxy_order(x), &n_prot);
+  // made on the actual values after ordering. Using a special variant
+  // of `vec_proxy_order()` to correctly support list columns.
+  r_obj* proxies = KEEP_N(vec_joint_proxy_order(x, y), &n_prot);
+
+  r_obj* x_proxy = r_list_get(proxies, 0);
   x_proxy = KEEP_N(vec_normalize_encoding(x_proxy), &n_prot);
   x_proxy = KEEP_N(proxy_chr_transform(x_proxy, chr_transform), &n_prot);
 
-  r_obj* y_proxy = KEEP_N(vec_proxy_order(y), &n_prot);
+  r_obj* y_proxy = r_list_get(proxies, 1);
   y_proxy = KEEP_N(vec_normalize_encoding(y_proxy), &n_prot);
   y_proxy = KEEP_N(proxy_chr_transform(y_proxy, chr_transform), &n_prot);
 

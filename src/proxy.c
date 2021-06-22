@@ -73,6 +73,131 @@ SEXP vec_proxy_order(SEXP x) {
   return out;
 }
 
+
+static r_obj* df_joint_proxy_order(r_obj* x, r_obj* y);
+static r_obj* list_joint_proxy_order(r_obj* x, r_obj* y, r_obj* method);
+
+/*
+ * Specialized internal variant of `vec_proxy_order()` used in `vec_matches()`.
+ * It generally just calls `vec_proxy_order()`, except in the case where we
+ * are taking the order-proxy of a list. This generates a proxy that orders
+ * by first appearance, so we need to combine `x` and `y` to jointly compute
+ * the proxy for comparisons to be correct in `vec_matches()`.
+ *
+ * For example
+ * x <- list(1.5, 2)
+ * y <- list(2, 1.5)
+ * vec_proxy_order(x)
+ * # [1] 1 2
+ * vec_proxy_order(y) # can't compare proxies when taken individually
+ * # [1] 1 2
+ * vec_proxy_order(c(x, y)) # jointly comparable
+ * # [1] 1 2 2 1
+ *
+ * We don't anticipate any other classes having this issue. Most order-proxies
+ * should be orderable by typical comparison operators.
+ * If that assumption proves incorrect, we may need to expose a new proxy
+ * for this.
+ */
+// [[ include("vctrs.h") ]]
+r_obj* vec_joint_proxy_order(r_obj* x, r_obj* y) {
+  if (vec_typeof(x) != vec_typeof(y)) {
+    r_stop_internal("vec_joint_proxy_order", "`x` and `y` should have the same type.");
+  }
+
+  if (is_data_frame(x)) {
+    return df_joint_proxy_order(x, y);
+  }
+
+  r_obj* method = KEEP(vec_proxy_order_method(x));
+  r_obj* vec_proxy_order_list = KEEP(vec_proxy_order_method(vctrs_shared_empty_list));
+
+  if (method == vec_proxy_order_list) {
+    // Special case if the chosen proxy method is `vec_proxy_order.list()`
+    r_obj* out = list_joint_proxy_order(x, y, method);
+    FREE(2);
+    return out;
+  }
+
+  r_obj* out = KEEP(r_alloc_list(2));
+  r_list_poke(out, 0, vec_proxy_order_invoke(x, method));
+  r_list_poke(out, 1, vec_proxy_order_invoke(y, method));
+
+  FREE(3);
+  return out;
+}
+
+static
+r_obj* df_joint_proxy_order(r_obj* x, r_obj* y) {
+  x = KEEP(r_clone_referenced(x));
+  y = KEEP(r_clone_referenced(y));
+
+  r_ssize n_cols = r_length(x);
+  if (n_cols != r_length(y)) {
+    r_stop_internal(
+      "df_joint_proxy_order",
+      "`x` and `y` must have the same number of columns."
+    );
+  }
+
+  r_obj* const* v_x = r_list_cbegin(x);
+  r_obj* const* v_y = r_list_cbegin(y);
+
+  for (r_ssize i = 0; i < n_cols; ++i) {
+    r_obj* proxies = vec_joint_proxy_order(v_x[i], v_y[i]);
+    r_list_poke(x, i, r_list_get(proxies, 0));
+    r_list_poke(y, i, r_list_get(proxies, 1));
+  }
+
+  x = KEEP(df_flatten(x));
+  x = KEEP(vec_proxy_unwrap(x));
+
+  y = KEEP(df_flatten(y));
+  y = KEEP(vec_proxy_unwrap(y));
+
+  r_obj* out = KEEP(r_alloc_list(2));
+  r_list_poke(out, 0, x);
+  r_list_poke(out, 1, y);
+
+  FREE(7);
+  return out;
+}
+
+static
+r_obj* list_joint_proxy_order(r_obj* x, r_obj* y, r_obj* method) {
+  r_ssize x_size = vec_size(x);
+  r_ssize y_size = vec_size(y);
+
+  r_obj* x_slicer = KEEP(compact_seq(0, x_size, true));
+  r_obj* y_slicer = KEEP(compact_seq(x_size, y_size, true));
+
+  r_obj* zap = KEEP(r_alloc_list(0));
+  r_poke_class(zap, r_chr("rlang_zap"));
+
+  r_obj* ptype = KEEP(vec_ptype(x, args_empty));
+
+  r_obj* out = KEEP(r_alloc_list(2));
+  r_list_poke(out, 0, x);
+  r_list_poke(out, 1, y);
+
+  // Combine
+  // NOTE: Without long vector support, this limits the maximum allowed
+  // size of `vec_matches()` input to `vec_size(x) + vec_size(y) <= INT_MAX`
+  // when list columns are used. This should be incredibly rare.
+  r_obj* combined = KEEP(vec_c(out, ptype, zap, p_no_repair_silent_ops));
+
+  // Compute order-proxy
+  r_obj* proxy = KEEP(vec_proxy_order_invoke(combined, method));
+
+  // Separate and store back in `out`
+  r_list_poke(out, 0, vec_slice_impl(proxy, x_slicer));
+  r_list_poke(out, 1, vec_slice_impl(proxy, y_slicer));
+
+  FREE(7);
+  return out;
+}
+
+
 SEXP vec_proxy_method(SEXP x) {
   return s3_find_method("vec_proxy", x, vctrs_method_table);
 }

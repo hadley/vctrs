@@ -42,7 +42,22 @@ test_that("can match Inf and -Inf with all conditions", {
   expect_identical(res$haystack, c(1L, 2L, 3L, 1L))
 })
 
+test_that("NA and NaN don't match numbers with equality conditions", {
+  expect_identical(vec_matches(1, NA_real_)$haystack, NA_integer_)
+  expect_identical(vec_matches(1, NaN)$haystack, NA_integer_)
+  expect_identical(vec_matches(NA_real_, 1)$haystack, NA_integer_)
+  expect_identical(vec_matches(NaN, 1)$haystack, NA_integer_)
+})
+
 test_that("NA and NaN are the same by default", {
+  res <- vec_matches(NA_real_, NaN)
+  expect_identical(res$needles, 1L)
+  expect_identical(res$haystack, 1L)
+
+  res <- vec_matches(NaN, NA_real_)
+  expect_identical(res$needles, 1L)
+  expect_identical(res$haystack, 1L)
+
   res <- vec_matches(c(NaN, NA, NaN), c(NA, NaN, NA), condition = "==")
   expect_identical(res$needles, rep(c(1L, 2L, 3L), each = 3))
   expect_identical(res$haystack, rep(c(1L, 2L, 3L), times = 3))
@@ -98,10 +113,15 @@ test_that("NA and NaN both propagate with `missing = 'propagate'` no matter the 
 test_that("complex can be matched", {
   x <- complex(real = 1, imaginary = c(1, 2))
   y <- complex(real = 1, imaginary = c(1, 1, 3))
+  z <- complex(real = 2, imaginary = 1)
 
   res <- vec_matches(x, y)
   expect_identical(res$needles, c(1L, 1L, 2L))
   expect_identical(res$haystack, c(1L, 2L, NA))
+
+  res <- vec_matches(x, z)
+  expect_identical(res$needles, c(1L, 2L))
+  expect_identical(res$haystack, c(NA_integer_, NA_integer_))
 })
 
 test_that("complex order lexicographically", {
@@ -186,9 +206,6 @@ test_that("list missingness propagates", {
 })
 
 test_that("list ordering is by first appearance in `needles` (so non-equi joins don't make much sense)", {
-  skip("Until #1401 is fixed")
-  skip("Since vec_proxy_order.list utilizes appearance order, but is computed separatly for x and y")
-
   x <- list(3, 2, 1, NULL)
   y <- list(1, 3, 1, 3)
 
@@ -200,6 +217,12 @@ test_that("list ordering is by first appearance in `needles` (so non-equi joins 
   # NULL still doesn't match anything
   expect_identical(res$needles, c(1L, 2L, 2L, 3L, 3L, 4L))
   expect_identical(res$haystack, c(NA, 2L, 4L, 2L, 4L, NA))
+
+  # With data frame columns containing list-columns
+  df1 <- data_frame(col = data_frame(x = x))
+  df2 <- data_frame(col = data_frame(x = y))
+
+  expect_identical(vec_matches(x, y, condition = ">"), res)
 })
 
 # ------------------------------------------------------------------------------
@@ -223,6 +246,48 @@ test_that("can match with >1 column data frames", {
 
   expect_identical(res$needles, c(1L, 1L, 2L, 3L, 3L, 4L))
   expect_identical(res$haystack, c(1L, 3L, NA, 1L, 3L, 2L))
+})
+
+test_that("can match with df-cols of varying types", {
+  y <- c(1L, 1L)
+
+  expect_needles <- c(1L, 2L)
+  expect_haystack <- c(NA, 1L)
+
+  df1 <- data_frame(x = data_frame(x = c(2L, 1L), y = y))
+  df2 <- data_frame(x = data_frame(x = c(1L, 3L), y = y))
+
+  res <- vec_matches(df1, df2)
+  expect_identical(res$needles, expect_needles)
+  expect_identical(res$haystack, expect_haystack)
+
+  df1 <- data_frame(x = data_frame(x = c(2, 1), y = y))
+  df2 <- data_frame(x = data_frame(x = c(1, 3), y = y))
+
+  res <- vec_matches(df1, df2)
+  expect_identical(res$needles, expect_needles)
+  expect_identical(res$haystack, expect_haystack)
+
+  df1 <- data_frame(x = data_frame(x = c(TRUE, FALSE), y = y))
+  df2 <- data_frame(x = data_frame(x = c(FALSE, NA), y = y))
+
+  res <- vec_matches(df1, df2)
+  expect_identical(res$needles, expect_needles)
+  expect_identical(res$haystack, expect_haystack)
+
+  df1 <- data_frame(x = data_frame(x = c("x", "y"), y = y))
+  df2 <- data_frame(x = data_frame(x = c("y", "z"), y = y))
+
+  res <- vec_matches(df1, df2)
+  expect_identical(res$needles, expect_needles)
+  expect_identical(res$haystack, expect_haystack)
+
+  df1 <- data_frame(x = data_frame(x = complex(real = c(1, 2), imaginary = c(2, 1)), y = y))
+  df2 <- data_frame(x = data_frame(x = complex(real = c(2, 3), imaginary = c(1, 1)), y = y))
+
+  res <- vec_matches(df1, df2)
+  expect_identical(res$needles, expect_needles)
+  expect_identical(res$haystack, expect_haystack)
 })
 
 test_that("ensure that matching works if outer runs are present (i.e. `==` comes before non-equi condition)", {
