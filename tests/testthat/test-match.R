@@ -647,6 +647,12 @@ test_that("errors on multiple matches that come from different nested containmen
   )
 })
 
+test_that("`multiple = 'error'` doesn't error errneously on the last observation", {
+  expect_error(res <- vec_matches(1:2, 1:2, multiple = "error"), NA)
+  expect_identical(res$needles, 1:2)
+  expect_identical(res$haystack, 1:2)
+})
+
 test_that("`multiple` is validated", {
   expect_error(vec_matches(1, 2, multiple = 1.5), "`multiple` must be a string")
   expect_error(vec_matches(1, 2, multiple = c("first", "last")), "`multiple` must be a string")
