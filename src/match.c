@@ -1735,6 +1735,21 @@ r_obj* new_vec_matches_result(r_ssize size) {
   return out;
 }
 
+static inline
+r_obj* new_vec_matches_result_from_columns(r_obj* needles, r_obj* haystack) {
+  r_obj* out = KEEP(r_alloc_list(MATCHES_DF_SIZE));
+
+  r_list_poke(out, MATCHES_DF_LOCS_needles, needles);
+  r_list_poke(out, MATCHES_DF_LOCS_haystack, haystack);
+
+  r_poke_names(out, r_chr_n(v_matches_df_names_c_strings, MATCHES_DF_SIZE));
+
+  r_init_data_frame(out, r_length(needles));
+
+  FREE(1);
+  return out;
+}
+
 // -----------------------------------------------------------------------------
 
 static
@@ -1909,10 +1924,15 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     size_out = (r_ssize) dbl_size_out;
   }
 
-  r_obj* out = KEEP_N(new_vec_matches_result(size_out), &n_prot);
+  r_keep_t out_needles_pi;
+  r_obj* out_needles = r_alloc_integer(size_out);
+  KEEP_HERE(out_needles, &out_needles_pi);
+  ++n_prot;
 
-  r_obj* out_needles = r_list_get(out, MATCHES_DF_LOCS_needles);
-  r_obj* out_haystack = r_list_get(out, MATCHES_DF_LOCS_haystack);
+  r_keep_t out_haystack_pi;
+  r_obj* out_haystack = r_alloc_integer(size_out);
+  KEEP_HERE(out_haystack, &out_haystack_pi);
+  ++n_prot;
 
   int* v_out_needles = r_int_begin(out_needles);
   int* v_out_haystack = r_int_begin(out_haystack);
@@ -2060,13 +2080,15 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     // for potential matches coming from a different nested containment group
     // to be filtered out in the above loop.
     // Can also happen with `no_match = "drop"` or `missing = "drop"`.
+    // Resize should be free by setting truelength and growable bit.
     size_out = loc_out;
-    r_init_data_frame(out, size_out);
+
     out_needles = r_int_resize(out_needles, size_out);
-    r_list_poke(out, MATCHES_DF_LOCS_needles, out_needles);
-    out_haystack = r_int_resize(out_haystack, size_out);
-    r_list_poke(out, MATCHES_DF_LOCS_haystack, out_haystack);
+    KEEP_AT(out_needles, out_needles_pi);
     v_out_needles = r_int_begin(out_needles);
+
+    out_haystack = r_int_resize(out_haystack, size_out);
+    KEEP_AT(out_haystack, out_haystack_pi);
     v_out_haystack = r_int_begin(out_haystack);
   }
 
@@ -2079,7 +2101,9 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     // orders them correctly, as within each needle group it will put the
     // haystack locations in ascending order (i.e. by first appearance).
     // This is expensive! `out` could have a huge number of matches.
-    r_obj* o_haystack_appearance = KEEP(vec_order(out, chrs_asc, chrs_smallest, true, r_null));
+    r_obj* both = KEEP(new_vec_matches_result_from_columns(out_needles, out_haystack));
+
+    r_obj* o_haystack_appearance = KEEP(vec_order(both, chrs_asc, chrs_smallest, true, r_null));
     const int* v_o_haystack_appearance = r_int_cbegin(o_haystack_appearance);
 
     r_obj* out_haystack2 = KEEP(r_alloc_integer(size_out));
@@ -2089,12 +2113,11 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
       v_out_haystack2[i] = v_out_haystack[v_o_haystack_appearance[i] - 1];
     }
 
-    r_list_poke(out, 1, out_haystack2);
     out_haystack = out_haystack2;
     v_out_haystack = v_out_haystack2;
 
-    FREE(2);
-    KEEP_N(out_haystack, &n_prot);
+    FREE(3);
+    KEEP_AT(out_haystack, out_haystack_pi);
   }
 
   if (has_no_match_haystack) {
@@ -2115,12 +2138,13 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     if (n_no_match_haystack > 0) {
       // Resize to have enough room for haystack no-matches at the end
       r_ssize new_size_out = r_ssize_add(size_out, n_no_match_haystack);
-      r_init_data_frame(out, new_size_out);
+
       out_needles = r_int_resize(out_needles, new_size_out);
-      r_list_poke(out, MATCHES_DF_LOCS_needles, out_needles);
-      out_haystack = r_int_resize(out_haystack, new_size_out);
-      r_list_poke(out, MATCHES_DF_LOCS_haystack, out_haystack);
+      KEEP_AT(out_needles, out_needles_pi);
       v_out_needles = r_int_begin(out_needles);
+
+      out_haystack = r_int_resize(out_haystack, new_size_out);
+      KEEP_AT(out_haystack, out_haystack_pi);
       v_out_haystack = r_int_begin(out_haystack);
 
       for (r_ssize i = size_out, j = 0; i < new_size_out; ++i, ++j) {
@@ -2131,6 +2155,8 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
       size_out = new_size_out;
     }
   }
+
+  r_obj* out = new_vec_matches_result_from_columns(out_needles, out_haystack);
 
   FREE(n_prot);
   return out;
