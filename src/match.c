@@ -2090,7 +2090,11 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
     }
 
     r_list_poke(out, 1, out_haystack2);
+    out_haystack = out_haystack2;
+    v_out_haystack = v_out_haystack2;
+
     FREE(2);
+    KEEP_N(out_haystack, &n_prot);
   }
 
   if (has_no_match_haystack) {

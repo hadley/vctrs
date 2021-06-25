@@ -783,6 +783,21 @@ test_that("`remaining` combined with `multiple = 'first/last'` treats non-first/
   expect_identical(res$haystack, c(1L, 3L, 2L))
 })
 
+test_that("`remaining` combined with the haystack reordering retains appearance order", {
+  x <- data_frame(a = 1, b = 4)
+  y <- data_frame(a = c(2, 1, 0), b = c(2, 1, 0))
+
+  # Appearance order for the haystack locations
+  res <- vec_matches(x, y, condition = c("<=", ">="))
+  expect_identical(res$needles, c(1L, 1L))
+  expect_identical(res$haystack, c(1L, 2L))
+
+  # Retain that appearance order of the matches, with remaining values appended
+  res <- vec_matches(x, y, condition = c("<=", ">="), remaining = NA_integer_)
+  expect_identical(res$needles, c(1L, 1L, NA))
+  expect_identical(res$haystack, c(1L, 2L, 3L))
+})
+
 test_that("`remaining` can error informatively", {
   verify_output(test_path("error", "test-matches-remaining.txt"), {
     "# default message"
