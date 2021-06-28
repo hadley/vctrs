@@ -330,6 +330,17 @@ test_that("df-cols propagate an NA if any columns are incomplete", {
   expect_identical(res$haystack, 1L)
 })
 
+test_that("df-cols aren't flattened, so `condition` is applied jointly on the df-col columns", {
+  x <- data_frame(a = 1L, b = data_frame(x = 3L, y = 4L))
+  y <- data_frame(a = 1L, b = data_frame(x = 2L, y = 5L))
+
+  # In particular `x$b[1,] > y$b[1,]` because `3 > 4` and that breaks the tie
+  # before any values of the `x$b$y` column are checked
+  res <- vec_matches(x, y, condition = c("==", ">"))
+  expect_identical(res$needles, 1L)
+  expect_identical(res$haystack, 1L)
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - rcrd
 
@@ -341,7 +352,21 @@ test_that("rcrd types can be matched", {
   expect_identical(res$needles, c(1L, 1L, 2L))
   expect_identical(res$haystack, c(1L, 2L, NA))
 
+  # In particular: `(3, 4) > (2, 5)` since the first elt breaks the tie
   res <- vec_matches(x, y, condition = ">")
+  expect_identical(res$needles, c(1L, 2L, 2L))
+  expect_identical(res$haystack, c(NA, 1L, 2L))
+})
+
+test_that("rcrd type matching works with rcrd-cols", {
+  x <- data_frame(a = c(1L, 1L), b = new_rcrd(list(x = c(1L, 3L), y = c(1L, 4L))))
+  y <- data_frame(a = c(1L, 1L), b = new_rcrd(list(x = c(1L, 2L), y = c(1L, 5L))))
+
+  res <- vec_matches(x, y, condition = c("==", "<="))
+  expect_identical(res$needles, c(1L, 1L, 2L))
+  expect_identical(res$haystack, c(1L, 2L, NA))
+
+  res <- vec_matches(x, y, condition = c("==", ">"))
   expect_identical(res$needles, c(1L, 2L, 2L))
   expect_identical(res$haystack, c(NA, 1L, 2L))
 })
