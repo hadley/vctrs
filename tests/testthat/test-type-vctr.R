@@ -250,17 +250,30 @@ test_that("diff matches base R", {
 # names -------------------------------------------------------------------
 
 test_that("all elements must be named if any are named", {
-  expect_error(new_vctr(setNames(1:2, c("a", NA))), "named")
-  expect_error(new_vctr(setNames(1:2, c("a", ""))), "named")
+  expect_error(new_vctr(setNames(1:2, c("a", NA))), "must not be `NA`")
+})
+
+test_that("the empty string is an allowed name", {
+  expect_named(new_vctr(set_names(1, "")), "")
+  expect_named(new_vctr(set_names(1:2, c("", "x"))), c("", "x"))
 })
 
 test_that("can not provide invalid names", {
   x <- new_vctr(c(a = 1, b = 2))
   expect_error(names(x) <- "x", "length")
-  expect_error(names(x) <- c("x", NA), "named")
-  expect_error(names(x) <- c("x", ""), "named")
+  expect_error(names(x) <- c("x", NA), "must not be `NA`")
   expect_error(names(x) <- c("x", "y", "z"), "length")
   expect_error(names(x) <- NULL, NA)
+})
+
+test_that("can set names to the empty string", {
+  x <- new_vctr(c(a = 1, b = 2))
+
+  names(x) <- c("", "")
+  expect_named(x, c("", ""))
+
+  names(x) <- c("", "x")
+  expect_named(x, c("", "x"))
 })
 
 test_that("can use [ and [[ with names", {

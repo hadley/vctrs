@@ -100,17 +100,17 @@ new_vctr <- function(.data,
 validate_names <- function(.data) {
   nms <- names(.data)
 
-  if (!names_all_or_nothing(nms)) {
-    stop("If any elements of `.data` are named, all must be named", call. = FALSE)
+  if (any_na_names(nms)) {
+    abort("The names of `.data` must not be `NA`.")
   }
 
   nms
 }
-names_all_or_nothing <- function(names) {
+any_na_names <- function(names) {
   if (is.null(names)) {
-    TRUE
+    FALSE
   } else {
-    all(names != "" & !is.na(names))
+    any(is.na(names))
   }
 }
 
@@ -269,8 +269,8 @@ diff.vctrs_vctr <- function(x, lag = 1L, differences = 1L, ...) {
   if (length(value) != 0 && length(value) != length(x)) {
     abort("`names()` must be the same length as x.")
   }
-  if (!names_all_or_nothing(value)) {
-    abort("If any elements are named, all elements must be named.")
+  if (any_na_names(value)) {
+    abort("Names must not be `NA`.")
   }
   NextMethod()
 }
