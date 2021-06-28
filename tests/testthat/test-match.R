@@ -350,14 +350,17 @@ test_that("rcrd type missingness is propagated correctly", {
   x <- new_rcrd(list(x = c(1L, NA), y = c(NA_integer_, NA_integer_)))
   y <- new_rcrd(list(x = c(1L, 2L, NA), y = c(NA, 5L, NA)))
 
+  # When `missing = "match"`, the types of incompleteness still must
+  # match exactly to have a match. i.e. (x=1L, y=NA) doesn't match (x=NA, y=1L).
+  # This is the same as the rule for data frames.
   res <- vec_matches(x, y, condition = "==", missing = "match")
   expect_identical(res$needles, c(1L, 2L))
   expect_identical(res$haystack, c(1L, 3L))
 
-  # Only the observation where all fields are NA is considered incomplete
+  # If any field contains NA, the entire observation is incomplete.
   res <- vec_matches(x, y, condition = "==", missing = "propagate")
   expect_identical(res$needles, c(1L, 2L))
-  expect_identical(res$haystack, c(1L, NA))
+  expect_identical(res$haystack, c(NA_integer_, NA_integer_))
 })
 
 # ------------------------------------------------------------------------------
