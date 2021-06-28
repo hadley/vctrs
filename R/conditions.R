@@ -59,6 +59,9 @@ NULL
 stop_vctrs <- function(message = NULL, class = NULL, ...) {
   abort(message, class = c(class, "vctrs_error"), ...)
 }
+warn_vctrs <- function(message = NULL, class = NULL, ...) {
+  warn(message, class = c(class, "vctrs_warning"), ...)
+}
 
 stop_incompatible <- function(x,
                               y,

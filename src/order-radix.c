@@ -15,6 +15,7 @@
 #include "utils.h"
 #include "lazy.h"
 #include "type-data-frame.h"
+#include "type-complex.h"
 #include "translate.h"
 #include "order-radix.h"
 #include "order-groups.h"
@@ -187,12 +188,6 @@
 
 static inline bool parse_nan_distinct(SEXP nan_distinct);
 
-static SEXP vec_order(SEXP x,
-                      SEXP direction,
-                      SEXP na_value,
-                      bool nan_distinct,
-                      SEXP chr_transform);
-
 // [[ register() ]]
 SEXP vctrs_order(SEXP x,
                  SEXP direction,
@@ -211,8 +206,12 @@ static SEXP vec_order_info_impl(SEXP x,
                                 bool chr_ordered,
                                 bool group_sizes);
 
-static
-SEXP vec_order(SEXP x, SEXP direction, SEXP na_value, bool nan_distinct, SEXP chr_transform) {
+// [[ include("order-radix.h") ]]
+SEXP vec_order(SEXP x,
+               SEXP direction,
+               SEXP na_value,
+               bool nan_distinct,
+               SEXP chr_transform) {
   const bool chr_ordered = true;
   const bool group_sizes = false;
   SEXP info = vec_order_info_impl(x, direction, na_value, nan_distinct, chr_transform, chr_ordered, group_sizes);
@@ -2755,47 +2754,6 @@ void cpl_order(SEXP x,
     p_x_chunk_dbl += group_size;
     p_o += group_size;
   }
-}
-
-/*
- * Normalises a complex value so that if one side is missing, both are. This
- * ensures that all missing complex values are grouped together, no matter
- * what type of missingness it is. NA and NaN can still be separated by
- * `nan_distinct`, resulting in 4 different combinations of missingness. These
- * 4 groups of missingness will still all be grouped together, either before
- * or after any non-missing values have appeared.
- * See issue #1403 for more information.
- */
-static inline
-r_complex_t cpl_normalise_missing(r_complex_t x) {
-  const double na = r_globals.na_dbl;
-  const double nan = R_NaN;
-
-  const enum vctrs_dbl_class r_type = dbl_classify(x.r);
-  const enum vctrs_dbl_class i_type = dbl_classify(x.i);
-
-  switch (r_type) {
-  case vctrs_dbl_number:
-    switch (i_type) {
-    case vctrs_dbl_number: return x;
-    case vctrs_dbl_missing: return (r_complex_t) {na, na};
-    case vctrs_dbl_nan: return (r_complex_t) {nan, nan};
-    }
-  case vctrs_dbl_missing:
-    switch (i_type) {
-    case vctrs_dbl_number: return (r_complex_t) {na, na};
-    case vctrs_dbl_missing: return x;
-    case vctrs_dbl_nan: return x;
-    }
-  case vctrs_dbl_nan:
-    switch (i_type) {
-    case vctrs_dbl_number: return (r_complex_t) {nan, nan};
-    case vctrs_dbl_missing: return x;
-    case vctrs_dbl_nan: return x;
-    }
-  }
-
-  never_reached("cpl_normalise_missing");
 }
 
 // -----------------------------------------------------------------------------

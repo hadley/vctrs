@@ -1,0 +1,28 @@
+
+default message
+===============
+
+> vec_matches(1, 2, no_match = "error")
+Error: Each element must have a match.
+x The element at location 1 does not have a match.
+
+
+can control arg names
+=====================
+
+> vec_matches(1, 2, no_match = "error", needles_arg = "foo")
+Error: Each element of `foo` must have a match.
+x The element at location 1 does not have a match.
+
+> vec_matches(1, 2, no_match = "error", needles_arg = "foo", haystack_arg = "bar")
+Error: Each element of `foo` must have a match in `bar`.
+x The element at location 1 does not have a match.
+
+
+with `condition = NULL`
+=======================
+
+> vec_matches(1, double(), no_match = "error", condition = NULL)
+Error: Each element must have a match.
+x The element at location 1 does not have a match.
+

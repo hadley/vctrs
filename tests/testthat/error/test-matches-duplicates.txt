@@ -1,0 +1,38 @@
+
+check for duplicates in haystack
+================================
+
+> vec_matches(c(1, 1), c(1, 1), check_duplicates = "haystack")
+Error: The haystack must not contain duplicate values.
+x The element at location 2 is a duplicate.
+
+> vec_matches(c(1, 1), c(1, 1), check_duplicates = "haystack", haystack_arg = "foo")
+Error: `foo` must not contain duplicate values.
+x The element at location 2 is a duplicate.
+
+
+check for duplicates in needles
+===============================
+
+> vec_matches(c(1, 1), c(1, 1), check_duplicates = "needles")
+Error: The needles must not contain duplicate values.
+x The element at location 2 is a duplicate.
+
+> vec_matches(c(1, 1), c(1, 1), check_duplicates = "needles", needles_arg = "foo")
+Error: `foo` must not contain duplicate values.
+x The element at location 2 is a duplicate.
+
+
+check for duplicates in both
+============================
+
+> vec_matches(c(1, 1), 1, check_duplicates = "both", needles_arg = "foo",
++ haystack_arg = "bar")
+Error: `foo` must not contain duplicate values.
+x The element at location 2 is a duplicate.
+
+> vec_matches(1, c(1, 1), check_duplicates = "both", needles_arg = "foo",
++ haystack_arg = "bar")
+Error: `bar` must not contain duplicate values.
+x The element at location 2 is a duplicate.
+

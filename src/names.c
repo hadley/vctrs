@@ -933,6 +933,7 @@ SEXP vctrs_validate_minimal_names(SEXP names, SEXP n_) {
 
 struct name_repair_opts unique_repair_default_opts;
 struct name_repair_opts unique_repair_silent_opts;
+struct name_repair_opts no_repair_silent_ops;
 
 void vctrs_init_names(SEXP ns) {
   syms_set_rownames_fallback = Rf_install("set_rownames_fallback");
@@ -954,6 +955,10 @@ void vctrs_init_names(SEXP ns) {
   unique_repair_default_opts.quiet = false;
 
   unique_repair_silent_opts.type = name_repair_unique;
+  unique_repair_silent_opts.fn = R_NilValue;
+  unique_repair_silent_opts.quiet = true;
+
+  no_repair_silent_ops.type = name_repair_none;
   unique_repair_silent_opts.fn = R_NilValue;
   unique_repair_silent_opts.quiet = true;
 }

@@ -1538,6 +1538,10 @@ SEXP chrs_cast = NULL;
 SEXP chrs_error = NULL;
 SEXP chrs_combine = NULL;
 SEXP chrs_convert = NULL;
+SEXP chrs_asc = NULL;
+SEXP chrs_desc = NULL;
+SEXP chrs_largest = NULL;
+SEXP chrs_smallest = NULL;
 
 SEXP syms_i = NULL;
 SEXP syms_n = NULL;
@@ -1554,6 +1558,8 @@ SEXP syms_y_arg = NULL;
 SEXP syms_to_arg = NULL;
 SEXP syms_times_arg = NULL;
 SEXP syms_subscript_arg = NULL;
+SEXP syms_needles_arg = NULL;
+SEXP syms_haystack_arg = NULL;
 SEXP syms_out = NULL;
 SEXP syms_value = NULL;
 SEXP syms_quiet = NULL;
@@ -1584,12 +1590,19 @@ SEXP syms_df_fallback = NULL;
 SEXP syms_s3_fallback = NULL;
 SEXP syms_stop_incompatible_type = NULL;
 SEXP syms_stop_incompatible_size = NULL;
+SEXP syms_stop_matches_nothing = NULL;
+SEXP syms_stop_matches_remaining = NULL;
+SEXP syms_stop_matches_missing = NULL;
+SEXP syms_stop_matches_duplicates = NULL;
+SEXP syms_stop_matches_multiple = NULL;
+SEXP syms_warn_matches_multiple = NULL;
 SEXP syms_action = NULL;
 SEXP syms_vctrs_common_class_fallback = NULL;
 SEXP syms_fallback_class = NULL;
 SEXP syms_abort = NULL;
 SEXP syms_message = NULL;
 SEXP syms_chr_transform = NULL;
+SEXP syms_needles = NULL;
 
 SEXP fns_bracket = NULL;
 SEXP fns_quote = NULL;
@@ -1755,6 +1768,10 @@ void vctrs_init_utils(SEXP ns) {
   chrs_error = r_new_shared_character("error");
   chrs_combine = r_new_shared_character("combine");
   chrs_convert = r_new_shared_character("convert");
+  chrs_asc = r_new_shared_character("asc");
+  chrs_desc = r_new_shared_character("desc");
+  chrs_largest = r_new_shared_character("largest");
+  chrs_smallest = r_new_shared_character("smallest");
 
   classes_tibble = r_new_shared_vector(STRSXP, 3);
 
@@ -1815,6 +1832,8 @@ void vctrs_init_utils(SEXP ns) {
   syms_to_arg = Rf_install("to_arg");
   syms_times_arg = Rf_install("times_arg");
   syms_subscript_arg = Rf_install("subscript_arg");
+  syms_needles_arg = Rf_install("needles_arg");
+  syms_haystack_arg = Rf_install("haystack_arg");
   syms_out = Rf_install("out");
   syms_value = Rf_install("value");
   syms_quiet = Rf_install("quiet");
@@ -1847,12 +1866,19 @@ void vctrs_init_utils(SEXP ns) {
   syms_s3_fallback = Rf_install("vctrs:::s3_fallback");
   syms_stop_incompatible_type = Rf_install("stop_incompatible_type");
   syms_stop_incompatible_size = Rf_install("stop_incompatible_size");
+  syms_stop_matches_nothing = Rf_install("stop_matches_nothing");
+  syms_stop_matches_remaining = Rf_install("stop_matches_remaining");
+  syms_stop_matches_duplicates = Rf_install("stop_matches_duplicates");
+  syms_stop_matches_missing = Rf_install("stop_matches_missing");
+  syms_stop_matches_multiple = Rf_install("stop_matches_multiple");
+  syms_warn_matches_multiple = Rf_install("warn_matches_multiple");
   syms_action = Rf_install("action");
   syms_vctrs_common_class_fallback = Rf_install(c_strs_vctrs_common_class_fallback);
   syms_fallback_class = Rf_install("fallback_class");
   syms_abort = Rf_install("abort");
   syms_message = Rf_install("message");
   syms_chr_transform = Rf_install("chr_transform");
+  syms_needles = Rf_install("needles");
 
   fns_bracket = Rf_findVar(syms_bracket, R_BaseEnv);
   fns_quote = Rf_findVar(Rf_install("quote"), R_BaseEnv);

@@ -6,14 +6,6 @@
 
 // -----------------------------------------------------------------------------
 
-struct poly_df_data {
-  enum vctrs_type* col_types;
-  const void** col_ptrs;
-  r_ssize n_col;
-};
-
-// -----------------------------------------------------------------------------
-
 static int p_df_equal_na_equal(const void* x, r_ssize i, const void* y, r_ssize j);
 
 // [[ include("poly-op.h") ]]

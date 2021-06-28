@@ -1,0 +1,28 @@
+
+default message
+===============
+
+> vec_matches(1, 2, remaining = "error")
+Error: Each haystack value must be matched.
+x The value at location 1 was not matched.
+
+
+can control arg names
+=====================
+
+> vec_matches(1, 2, remaining = "error", needles_arg = "foo")
+Error: Each haystack value must be matched by `foo`.
+x The value at location 1 was not matched.
+
+> vec_matches(1, 2, remaining = "error", needles_arg = "foo", haystack_arg = "bar")
+Error: Each haystack value of `bar` must be matched by `foo`.
+x The value at location 1 was not matched.
+
+
+with `condition = NULL`
+=======================
+
+> vec_matches(double(), c(1, 2), remaining = "error", condition = NULL)
+Error: Each haystack value must be matched.
+x The value at location 1 was not matched.
+

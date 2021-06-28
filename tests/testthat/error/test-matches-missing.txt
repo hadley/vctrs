@@ -1,0 +1,16 @@
+
+default message
+===============
+
+> vec_matches(NA, 1, missing = "error")
+Error: No element can be missing.
+x The element at location 1 is missing.
+
+
+can control arg names
+=====================
+
+> vec_matches(NA, 1, missing = "error", needles_arg = "foo")
+Error: No element of `foo` can be missing.
+x The element at location 1 is missing.
+
