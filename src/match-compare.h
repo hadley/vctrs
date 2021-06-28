@@ -3,6 +3,7 @@
 
 #include "compare.h"
 #include "poly-op.h"
+#include "type-complex.h"
 
 /*
  * These comparison operators are designed to match the comparison order
@@ -61,7 +62,11 @@ int dbl_order_compare_na_equal(double x, double y, bool nan_distinct) {
 }
 static inline
 int cpl_order_compare_na_equal(r_complex_t x, r_complex_t y, bool nan_distinct) {
-  int cmp = dbl_order_compare_na_equal(x.r, y.r, nan_distinct);
+  x = cpl_normalise_missing(x);
+  y = cpl_normalise_missing(y);
+
+  const int cmp = dbl_order_compare_na_equal(x.r, y.r, nan_distinct);
+
   if (cmp == 0) {
     return dbl_order_compare_na_equal(x.i, y.i, nan_distinct);
   } else {

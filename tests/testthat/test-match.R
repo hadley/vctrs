@@ -159,6 +159,25 @@ test_that("complex missing values match correctly", {
   )
 })
 
+test_that("complex missing values are always grouped together (#1403)", {
+  # Unlike data frames and rcrd types, for complex vectors if either element
+  # is missing then the whole observation is normalised to have both components
+  # be missing. This means `1+NAi` matches `2+NAi`. It also matches `2+NaNi`
+  # unless `nan_distinct = TRUE`.
+  x <- complex(real = c(1, 1, 2, 2, 2), imaginary = c(NA, 1, NA, 2, NaN))
+  y <- x[-1]
+
+  res <- vec_matches(x, y, condition = ">=")
+  expect_identical(res$needles, c(1L, 1L, 2L, 3L, 3L, 4L, 4L, 5L, 5L))
+  expect_identical(res$haystack, c(2L, 4L, 1L, 2L, 4L, 1L, 3L, 2L, 4L))
+
+  # This matches base R behavior with complex
+  expect_identical(
+    vec_matches(x, x, nan_distinct = TRUE, multiple = "first")$haystack,
+    match(x, x)
+  )
+})
+
 # ------------------------------------------------------------------------------
 # vec_matches() - characters
 
