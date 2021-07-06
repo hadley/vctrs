@@ -478,20 +478,37 @@ test_that("date-time vs date-time", {
   expect_identical(vec_arith("-", lt, dt), difftime(lt, dt))
 })
 
-test_that("date-time vs numeric", {
+test_that("date-time vs integer/double", {
    d <- as.Date("2018-01-01")
    dt <- as.POSIXct("2018-01-01", tz = "America/New_York")
    lt <- as.POSIXlt(dt)
+
+   expect_identical(vec_arith("+", d, 1L), d + 1L)
+   expect_identical(vec_arith("+", 1L, d), d + 1L)
+   expect_identical(vec_arith("-", d, 1L), d - 1L)
+   expect_error(vec_arith("-", 1L, d), class = "vctrs_error_incompatible_op")
 
    expect_identical(vec_arith("+", d, 1), d + 1)
    expect_identical(vec_arith("+", 1, d), d + 1)
    expect_identical(vec_arith("-", d, 1), d - 1)
    expect_error(vec_arith("-", 1, d), class = "vctrs_error_incompatible_op")
 
+
+   expect_identical(vec_arith("+", dt, 1L), dt + 1L)
+   expect_identical(vec_arith("+", 1L, dt), dt + 1L)
+   expect_identical(vec_arith("-", dt, 1L), dt - 1L)
+   expect_error(vec_arith("-", 1L, dt), class = "vctrs_error_incompatible_op")
+
    expect_identical(vec_arith("+", dt, 1), dt + 1)
    expect_identical(vec_arith("+", 1, dt), dt + 1)
    expect_identical(vec_arith("-", dt, 1), dt - 1)
    expect_error(vec_arith("-", 1, dt), class = "vctrs_error_incompatible_op")
+
+
+   expect_identical(vec_arith("+", lt, 1L), lt + 1L)
+   expect_identical(vec_arith("+", 1L, lt), lt + 1L)
+   expect_identical(vec_arith("-", lt, 1L), lt - 1L)
+   expect_error(vec_arith("-", 1L, lt), class = "vctrs_error_incompatible_op")
 
    expect_identical(vec_arith("+", lt, 1), lt + 1)
    expect_identical(vec_arith("+", 1, lt), lt + 1)
@@ -499,18 +516,33 @@ test_that("date-time vs numeric", {
    expect_error(vec_arith("-", 1, lt), class = "vctrs_error_incompatible_op")
 
 
+   expect_error(vec_arith("*", 1L, d), class = "vctrs_error_incompatible_op")
+   expect_error(vec_arith("*", d, 1L), class = "vctrs_error_incompatible_op")
+
    expect_error(vec_arith("*", 1, d), class = "vctrs_error_incompatible_op")
    expect_error(vec_arith("*", d, 1), class = "vctrs_error_incompatible_op")
 
+
+   expect_error(vec_arith("*", 1L, dt), class = "vctrs_error_incompatible_op")
+   expect_error(vec_arith("*", dt, 1L), class = "vctrs_error_incompatible_op")
+
    expect_error(vec_arith("*", 1, dt), class = "vctrs_error_incompatible_op")
    expect_error(vec_arith("*", dt, 1), class = "vctrs_error_incompatible_op")
+
+
+   expect_error(vec_arith("*", 1L, lt), class = "vctrs_error_incompatible_op")
+   expect_error(vec_arith("*", lt, 1L), class = "vctrs_error_incompatible_op")
 
    expect_error(vec_arith("*", 1, lt), class = "vctrs_error_incompatible_op")
    expect_error(vec_arith("*", lt, 1), class = "vctrs_error_incompatible_op")
 })
 
-test_that("POSIXlt + numeric = POSIXct", {
+test_that("POSIXlt + integer/double = POSIXct", {
   lt <- as.POSIXlt("2018-01-01", tz = "America/New_York")
+
+  expect_s3_class(vec_arith("+", lt, 1L), "POSIXct")
+  expect_s3_class(vec_arith("+", 1L, lt), "POSIXct")
+
   expect_s3_class(vec_arith("+", lt, 1), "POSIXct")
   expect_s3_class(vec_arith("+", 1, lt), "POSIXct")
 })
@@ -568,24 +600,32 @@ test_that("date-time vs difftime", {
   expect_error(vec_arith("-", th, lt), class = "vctrs_error_incompatible_op")
 })
 
-test_that("difftime vs difftime/numeric", {
+test_that("difftime vs difftime/integer/double", {
   t <- as.difftime(12, units = "hours")
 
   expect_identical(vec_arith("-", t, MISSING()), -t)
   expect_identical(vec_arith("+", t, MISSING()), t)
 
   expect_identical(vec_arith("-", t, t), t - t)
+  expect_identical(vec_arith("-", t, 1L), t - 1L)
+  expect_identical(vec_arith("-", 1L, t), 1L - t)
   expect_identical(vec_arith("-", t, 1), t - 1)
   expect_identical(vec_arith("-", 1, t), 1 - t)
 
   expect_identical(vec_arith("+", t, t), 2 * t)
+  expect_identical(vec_arith("+", t, 1L), t + 1L)
+  expect_identical(vec_arith("+", 1L, t), t + 1L)
   expect_identical(vec_arith("+", t, 1), t + 1)
   expect_identical(vec_arith("+", 1, t), t + 1)
 
+  expect_identical(vec_arith("*", 2L, t), 2L * t)
+  expect_identical(vec_arith("*", t, 2L), 2L * t)
   expect_identical(vec_arith("*", 2, t), 2 * t)
   expect_identical(vec_arith("*", t, 2), 2 * t)
   expect_error(vec_arith("*", t, t), class = "vctrs_error_incompatible_op")
 
+  expect_identical(vec_arith("/", t, 2L), t / 2L)
+  expect_error(vec_arith("/", 2L, t), class = "vctrs_error_incompatible_op")
   expect_identical(vec_arith("/", t, 2), t / 2)
   expect_error(vec_arith("/", 2, t), class = "vctrs_error_incompatible_op")
 

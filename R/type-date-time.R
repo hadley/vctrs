@@ -384,15 +384,30 @@ vec_arith.POSIXlt.POSIXct <- vec_arith.POSIXct.POSIXct
 #' @export
 vec_arith.POSIXct.POSIXlt <- vec_arith.POSIXct.POSIXct
 
-#' @method vec_arith.Date numeric
+#' @method vec_arith.Date integer
 #' @export
-vec_arith.Date.numeric <- function(op, x, y, ...) {
+vec_arith.Date.integer <- function(op, x, y, ...) {
   switch(op,
     `+` = vec_restore(vec_arith_base(op, x, y), x),
     `-` = vec_restore(vec_arith_base(op, x, y), x),
     stop_incompatible_op(op, x, y)
   )
 }
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.integer.Date <- function(op, x, y, ...) {
+#   switch(op,
+#     `+` = vec_restore(vec_arith_base(op, x, y), y),
+#     stop_incompatible_op(op, x, y)
+#   )
+# }
+#' @method vec_arith.Date double
+#' @export
+vec_arith.Date.double <- vec_arith.Date.integer
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.double.Date <- vec_arith.integer.Date
+# FIXME: Remove numeric method after custom double dispatch
 #' @method vec_arith.numeric Date
 #' @export
 vec_arith.numeric.Date <- function(op, x, y, ...) {
@@ -401,17 +416,43 @@ vec_arith.numeric.Date <- function(op, x, y, ...) {
     stop_incompatible_op(op, x, y)
   )
 }
-#' @method vec_arith.POSIXct numeric
+#' @method vec_arith.POSIXct integer
 #' @export
-vec_arith.POSIXct.numeric <- vec_arith.Date.numeric
+vec_arith.POSIXct.integer <- vec_arith.Date.integer
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.integer.POSIXct <- vec_arith.integer.Date
+#' @method vec_arith.POSIXct double
+#' @export
+vec_arith.POSIXct.double <- vec_arith.Date.double
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.double.POSIXct <- vec_arith.double.Date
+# FIXME: Remove numeric method after custom double dispatch
 #' @method vec_arith.numeric POSIXct
 #' @export
 vec_arith.numeric.POSIXct <- vec_arith.numeric.Date
-#' @method vec_arith.POSIXlt numeric
+#' @method vec_arith.POSIXlt integer
 #' @export
-vec_arith.POSIXlt.numeric <- function(op, x, y, ...) {
-  vec_arith.POSIXct.numeric(op, as.POSIXct(x), y, ...)
+vec_arith.POSIXlt.integer <- function(op, x, y, ...) {
+  vec_arith.POSIXct.integer(op, as.POSIXct(x), y, ...)
 }
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.integer.POSIXlt <- function(op, x, y, ...) {
+#   vec_arith.integer.POSIXct(op, x, as.POSIXct(y), ...)
+# }
+#' @method vec_arith.POSIXlt double
+#' @export
+vec_arith.POSIXlt.double <- function(op, x, y, ...) {
+  vec_arith.POSIXct.double(op, as.POSIXct(x), y, ...)
+}
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.double.POSIXlt <- function(op, x, y, ...) {
+#   vec_arith.double.POSIXct(op, x, as.POSIXct(y), ...)
+# }
+# FIXME: Remove numeric method after custom double dispatch
 #' @method vec_arith.numeric POSIXlt
 #' @export
 vec_arith.numeric.POSIXlt <- function(op, x, y, ...) {
@@ -499,11 +540,33 @@ vec_arith.difftime.MISSING <- function(op, x, y, ...) {
   )
 }
 
-#' @method vec_arith.difftime numeric
+#' @method vec_arith.difftime integer
 #' @export
-vec_arith.difftime.numeric <- function(op, x, y, ...) {
+vec_arith.difftime.integer <- function(op, x, y, ...) {
   vec_restore(vec_arith_base(op, x, y), x)
 }
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.integer.difftime <- function(op, x, y, ...) {
+#   switch(op,
+#     `/` = stop_incompatible_op(op, x, y),
+#     vec_restore(vec_arith_base(op, x, y), y)
+#   )
+# }
+#' @method vec_arith.difftime double
+#' @export
+vec_arith.difftime.double <- function(op, x, y, ...) {
+  vec_restore(vec_arith_base(op, x, y), x)
+}
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.double.difftime <- function(op, x, y, ...) {
+#   switch(op,
+#     `/` = stop_incompatible_op(op, x, y),
+#     vec_restore(vec_arith_base(op, x, y), y)
+#   )
+# }
+# FIXME: Remove numeric method after custom double dispatch
 #' @method vec_arith.numeric difftime
 #' @export
 vec_arith.numeric.difftime <- function(op, x, y, ...) {

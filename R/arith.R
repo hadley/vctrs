@@ -65,21 +65,43 @@ vec_arith.logical.default <- function(op, x, y, ...) stop_incompatible_op(op, x,
 #' @method vec_arith.logical logical
 #' @export
 vec_arith.logical.logical <- function(op, x, y, ...) vec_arith_base(op, x, y)
-#' @method vec_arith.logical numeric
+#' @method vec_arith.logical integer
 #' @export
-vec_arith.logical.numeric <- function(op, x, y, ...) vec_arith_base(op, x, y)
+vec_arith.logical.integer <- function(op, x, y, ...) vec_arith_base(op, x, y)
+#' @method vec_arith.logical double
+#' @export
+vec_arith.logical.double <- function(op, x, y, ...) vec_arith_base(op, x, y)
+
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.integer.integer <- function(op, x, y, ...) vec_arith_base(op, x, y)
+# #' @export
+# vec_arith.integer.double <- function(op, x, y, ...) vec_arith_base(op, x, y)
+# #' @export
+# vec_arith.integer.logical <- function(op, x, y, ...) vec_arith_base(op, x, y)
+
+# FIXME: Uncomment after custom double dispatch
+# #' @export
+# vec_arith.double.double <- function(op, x, y, ...) vec_arith_base(op, x, y)
+# #' @export
+# vec_arith.double.integer <- function(op, x, y, ...) vec_arith_base(op, x, y)
+# #' @export
+# vec_arith.double.logical <- function(op, x, y, ...) vec_arith_base(op, x, y)
 
 #' @rdname vec_arith
 #' @export vec_arith.numeric
 #' @method vec_arith numeric
 #' @export
 vec_arith.numeric <- function(op, x, y, ...) UseMethod("vec_arith.numeric", y)
+# FIXME: Remove numeric method after custom double dispatch
 #' @method vec_arith.numeric default
 #' @export
 vec_arith.numeric.default <- function(op, x, y, ...) stop_incompatible_op(op, x, y)
+# FIXME: Remove numeric method after custom double dispatch
 #' @method vec_arith.numeric logical
 #' @export
 vec_arith.numeric.logical <- function(op, x, y, ...) vec_arith_base(op, x, y)
+# FIXME: Remove numeric method after custom double dispatch
 #' @method vec_arith.numeric numeric
 #' @export
 vec_arith.numeric.numeric <- function(op, x, y, ...) vec_arith_base(op, x, y)
