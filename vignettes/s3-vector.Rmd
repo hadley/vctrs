@@ -1083,3 +1083,10 @@ It's good practice to test your new class. Specific recommendations:
     ```
 
 If your tests pass when run by `devtools::test()`, but fail when run in `R CMD check`, it is very likely to reflect a problem with S3 method registration. Carefully check your roxygen2 comments and the generated `NAMESPACE`.
+
+
+### Existing classes
+
+Before you build your own class, you might want to consider using, or subclassing existing classes. You can check [awesome-vctrs](https://github.com/krlmlr/awesome-vctrs) for a curated list of R vector classes, some of which are built with vctrs.
+
+If you've built or extended a class, consider adding it to that list so other people can use it.
